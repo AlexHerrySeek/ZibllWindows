@@ -1005,7 +1005,6 @@ del ""%~f0"" & exit";
                 Title = "Xác nhận",
                 Content = "Bạn có chắc chắn muốn đặt lại tất cả cài đặt về mặc định?\n\nỨng dụng sẽ khởi động lại sau khi đặt lại.",
                 PrimaryButtonText = "Đặt lại",
-                // ...existing code...
             }.ShowDialogAsync();
 
             if (result == Wpf.Ui.Controls.MessageBoxResult.Primary)
@@ -1066,7 +1065,6 @@ del ""%~f0"" & exit";
                 Title = "Xác nhận",
                 Content = $"Bạn có muốn kích hoạt {message}?",
                 PrimaryButtonText = "OK",
-                // ...existing code...
             }.ShowDialogAsync();
 
             if (result == Wpf.Ui.Controls.MessageBoxResult.Primary)
@@ -1141,7 +1139,6 @@ del ""%~f0"" & exit";
                 Title = "Xác nhận",
                 Content = "Bạn có muốn gỡ bỏ tất cả kích hoạt KMS/Ohook?\n\nThao tác này sẽ xóa:\n- Ohook activation\n- KMS activation\n- Scheduled tasks",
                 PrimaryButtonText = "OK",
-                // ...existing code...
             }.ShowDialogAsync();
 
             if (result == Wpf.Ui.Controls.MessageBoxResult.Primary)
@@ -1201,7 +1198,6 @@ del ""%~f0"" & exit";
                 Title = "Cài đặt Product Key",
                 Content = "Nhập Product Key (25 ký tự):\n\nVí dụ: XXXXX-XXXXX-XXXXX-XXXXX-XXXXX",
                 PrimaryButtonText = "OK",
-                // ...existing code...
             };
             await inputBox.ShowDialogAsync();
             
@@ -1218,7 +1214,6 @@ del ""%~f0"" & exit";
                 Title = "Đổi phiên bản Windows",
                 Content = "Để đổi phiên bản Windows:\n\n1. Mở Settings > Update & Security > Activation\n2. Click 'Change product key'\n3. Nhập key tương ứng với phiên bản muốn chuyển.",
                 PrimaryButtonText = "OK",
-                // ...existing code...
             }.ShowDialogAsync();
         }
 
@@ -1229,7 +1224,6 @@ del ""%~f0"" & exit";
                 Title = "Xác nhận",
                 Content = "Chuyển đổi Office từ Retail/C2R sang Volume?\n\nĐiều này cần thiết để kích hoạt KMS.",
                 PrimaryButtonText = "OK",
-                // ...existing code...
             }.ShowDialogAsync();
 
             if (result == Wpf.Ui.Controls.MessageBoxResult.Primary)
@@ -1310,7 +1304,6 @@ del ""%~f0"" & exit";
                 Title = "Trích xuất $OEM$ Folder",
                 Content = "Tạo $OEM$ folder để cài Windows tự động kích hoạt?\n\nFolder sẽ được tạo trên Desktop.",
                 PrimaryButtonText = "OK",
-                // ...existing code...
             }.ShowDialogAsync();
 
             if (result == Wpf.Ui.Controls.MessageBoxResult.Primary)
@@ -1402,7 +1395,6 @@ del /f /q ""%~f0""
                 Content = "Tự động sửa các lỗi activation và rebuild licensing?\n\nQuá trình này có thể mất vài phút.",
                 PrimaryButtonText = "OK",
                 CloseButtonText = "Hủy",
-                // ...existing code...
             }.ShowDialogAsync();
 
             if (result == Wpf.Ui.Controls.MessageBoxResult.Primary)
@@ -1481,7 +1473,6 @@ del /f /q ""%~f0""
                 Content = " CẢNH BÁO: Reset toàn bộ hệ thống licensing?\n\nĐiều này sẽ xóa tất cả licenses và activation hiện tại. Máy tính sẽ cần khởi động lại.",
                 PrimaryButtonText = "OK",
                 CloseButtonText = "Hủy",
-                // ...existing code...
             }.ShowDialogAsync();
 
             if (result == Wpf.Ui.Controls.MessageBoxResult.Primary)

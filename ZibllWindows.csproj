@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <StartupObject>ZibllWindows.Program</StartupObject>
+    
+    <!-- Assembly Information -->
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
+    <Version>1.2.0</Version>
+    <Product>ZibllWindows</Product>
+    <Company>AlexHerrySeek</Company>
+    <Copyright>Copyright © 2025 AlexHerrySeek. Tất cả các quyền được bảo lưu.</Copyright>
+    <Description>ZibllWindows - Công cụ kích hoạt Windows và Office mạnh mẽ, dễ dàng, nhanh chóng và miễn phí</Description>
+    <Authors>Alex Herry (Nguyễn Minh Nhật)</Authors>
+    <PackageProjectUrl>https://github.com/AlexHerrySeek/ZibllWindows</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/AlexHerrySeek/ZibllWindows</RepositoryUrl>
+    <NeutralLanguage>vi-VN</NeutralLanguage>
+    
+    <!-- Single-file publish settings -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <ApplicationIcon>zibllwindows.ico</ApplicationIcon>
+    <Title>ZibllWindows - Alex Herry</Title>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>zibllwindows.ico</PackageIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="zibllwindows.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Management" Version="10.0.0" />
+    <PackageReference Include="WPF-UI" Version="3.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="zibllwindows.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Update="zibllwindows.ico">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>

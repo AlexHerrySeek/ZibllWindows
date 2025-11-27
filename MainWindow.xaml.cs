@@ -686,8 +686,8 @@ namespace ZibllWindows
                 {
                     httpClient.Timeout = TimeSpan.FromMinutes(5);
                     
-                    string downloadUrl = "https://raw.githubusercontent.com/AlexHerrySeek/ZibllWindows/refs/heads/main/backend/zibllwindows.exe";
-                    
+                    string downloadUrl = "https://github.com/AlexHerrySeek/ZibllWindows/releases/download/AutoUpdate/ZibllWindows.exe";
+
                     // Download to temp file
                     string tempPath = Path.Combine(Path.GetTempPath(), "ZibllWindows_Update.exe");
                     byte[] fileBytes = await httpClient.GetByteArrayAsync(downloadUrl);

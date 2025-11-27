@@ -1,9 +1,13 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\Users\\NguyenNhatSakura\\Documents\\d\u1EF1 \u00E1n\\ActivationTool\\",
+  "WorkspaceRootPath": "C:\\Users\\NguyenNhatSakura\\Documents\\GitHub\\ZibllWindows\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|c:\\users\\nguyennhatsakura\\documents\\d\u1EF1 \u00E1n\\activationtool\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "AbsoluteMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|c:\\users\\nguyennhatsakura\\documents\\github\\zibllwindows\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|solutionrelative:mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|c:\\users\\nguyennhatsakura\\documents\\github\\zibllwindows\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
       "RelativeMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|solutionrelative:mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
     }
   ],
@@ -23,10 +27,23 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "MainWindow.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\NguyenNhatSakura\\Documents\\GitHub\\ZibllWindows\\MainWindow.xaml.cs",
+              "RelativeDocumentMoniker": "MainWindow.xaml.cs",
+              "ToolTip": "C:\\Users\\NguyenNhatSakura\\Documents\\GitHub\\ZibllWindows\\MainWindow.xaml.cs",
+              "RelativeToolTip": "MainWindow.xaml.cs",
+              "ViewState": "AgIAAJ8CAAAAAAAAAAAgwK8CAAAUAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-11-27T12:33:54.804Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "MainWindow.xaml",
-              "DocumentMoniker": "C:\\Users\\NguyenNhatSakura\\Documents\\d\u1EF1 \u00E1n\\ActivationTool\\MainWindow.xaml",
+              "DocumentMoniker": "C:\\Users\\NguyenNhatSakura\\Documents\\GitHub\\ZibllWindows\\MainWindow.xaml",
               "RelativeDocumentMoniker": "MainWindow.xaml",
-              "ToolTip": "C:\\Users\\NguyenNhatSakura\\Documents\\d\u1EF1 \u00E1n\\ActivationTool\\MainWindow.xaml",
+              "ToolTip": "C:\\Users\\NguyenNhatSakura\\Documents\\GitHub\\ZibllWindows\\MainWindow.xaml",
               "RelativeToolTip": "MainWindow.xaml",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
               "WhenOpened": "2025-11-27T12:16:27.496Z",

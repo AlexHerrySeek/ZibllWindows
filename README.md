@@ -1,4 +1,3 @@
-# ZibllWindows - Công cụ kích hoạt Windows và Office mạnh mẽ, dễ dàng, nhanh chóng và miễn phí.
 
 <div align="center">
 

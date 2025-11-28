@@ -1,4 +1,4 @@
-# ZibllWindows
+# ZibllWindows - Công cụ kích hoạt Windows và Office mạnh mẽ, dễ dàng, nhanh chóng và miễn phí.
 
 <div align="center">
 
@@ -189,9 +189,9 @@ Nếu bạn muốn đóng góp cho dự án:
 
 ## 📝 Credit
 
-- **Microsoft Activation Scripts (MAS)**: https://massgrave.dev
 - **WPF-UI Library**: https://github.com/lepoco/wpfui
 - **Developer**: Alex Herry (Nguyễn Minh Nhật)
+- **Động Lực**: Hà Quỳnh Anh (qa.xiuoi) `on tiktok`
 
 ---
 

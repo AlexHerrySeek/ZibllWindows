@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -967,13 +968,13 @@ del ""%~f0"" & exit";
             var selectedItem = BackdropComboBox.SelectedItem as System.Windows.Controls.ComboBoxItem;
             if (selectedItem == null) return;
 
-            var backdropType = selectedItem.Content.ToString() ?? "None";
+            var backdropType = selectedItem.Content.ToString() ?? "Mặc Định";
             
             try
             {
                 switch (backdropType)
                 {
-                    case "None":
+                    case "Mặc Định":
                         Wpf.Ui.Appearance.SystemThemeWatcher.UnWatch(this);
                         break;
                     case "Mica":
@@ -1080,48 +1081,54 @@ del ""%~f0"" & exit";
                 ShowBusy($"Đang kích hoạt ({method.ToUpper()})...");
                 SetStatus($"Đang kích hoạt bằng phương pháp {method.ToUpper()}...", InfoBarSeverity.Warning);
                 DisableButtons();
-                // LoadingProgress is kept for Home page; BusyOverlay blocks globally
-                
-                string psCommand = method switch
-                {
-                    "hwid" => "irm https://massgrave.dev/get | iex; hwid",
-                    "kms38" => "irm https://massgrave.dev/get | iex; kms38",
-                    "kms" => "irm https://massgrave.dev/get | iex; kms",
-                    "ohook" => "irm https://massgrave.dev/get | iex; ohook",
-                    "kms_office" => "irm https://massgrave.dev/get | iex; kms /o",
-                    _ => "irm https://massgrave.dev/get | iex"
-                };
-                
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -Command \"{psCommand}\"",
-                    UseShellExecute = true,
-                    Verb = "runas",
-                    WindowStyle = ProcessWindowStyle.Hidden
-                };
 
-                using (var process = new Process { StartInfo = psi })
+                bool success = false;
+                string productName = GetWindowsProductName();
+
+                if (method == "kms" || method == "kms_office" || method == "kms38")
                 {
-                    process.Start();
-                    await Task.Run(() => process.WaitForExit());
-                    
-                    if (process.ExitCode == 0)
+                    if (method == "kms_office")
                     {
-                        SetStatus("Kích hoạt thành công!", InfoBarSeverity.Success);
-                        await ShowInfoDialogAsync(" Kích hoạt thành công", "Quá trình kích hoạt đã hoàn tất.");
+                        success = await ActivateOfficeWithKMS();
+                    }
+                    else if (IsWindowsServer(productName))
+                    {
+                        success = await ActivateWindowsServerWithKMS(productName);
                     }
                     else
                     {
-                        SetStatus("Kích hoạt thất bại!", InfoBarSeverity.Error);
-                        await ShowInfoDialogAsync(" Kích hoạt thất bại", "Có lỗi xảy ra trong quá trình kích hoạt.");
+                        success = await ActivateWindowsClientWithKMS(productName);
                     }
+                }
+                else if (method == "hwid")
+                {
+                    success = await ActivateWithHWID();
+                }
+                else if (method == "ohook")
+                {
+                    success = await ActivateWithOhook();
+                }
+                else
+                {
+                    SetStatus("Phương pháp không được hỗ trợ!", InfoBarSeverity.Error);
+                    await ShowInfoDialogAsync(" Lỗi", "Phương pháp kích hoạt không được hỗ trợ.");
+                    return;
+                }
+
+                if (success)
+                {
+                    SetStatus("Kích hoạt thành công!", InfoBarSeverity.Success);
+                    await ShowInfoDialogAsync(" Kích hoạt thành công", "Quá trình kích hoạt đã hoàn tất.");
+                }
+                else
+                {
+                    SetStatus("Kích hoạt thất bại!", InfoBarSeverity.Error);
+                    await ShowInfoDialogAsync(" Kích hoạt thất bại", "Có lỗi xảy ra trong quá trình kích hoạt.");
                 }
             }
             catch (Exception ex)
             {
                 SetStatus("Lỗi: " + ex.Message, InfoBarSeverity.Error);
-                
                 await ShowInfoDialogAsync(" Lỗi", $"Lỗi: {ex.Message}");
             }
             finally
@@ -1131,7 +1138,969 @@ del ""%~f0"" & exit";
             }
         }
 
-        // Additional Tools
+        private string GetWindowsProductName()
+        {
+            try
+            {
+                object value = Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "ProductName", "");
+                return value?.ToString() ?? "Unknown";
+            }
+            catch (Exception)
+            {
+                return "Unknown";
+            }
+        }
+
+        private bool IsWindowsServer(string productName)
+        {
+            if (string.IsNullOrEmpty(productName))
+                return false;
+
+            string lowerProductName = productName.ToLower();
+            return lowerProductName.Contains("server") ||
+                   lowerProductName.Contains("datacenter") ||
+                   (lowerProductName.Contains("standard") && lowerProductName.Contains("server"));
+        }
+
+        private async Task<bool> ActivateWindowsClientWithKMS(string productName)
+        {
+            try
+            {
+                // Dictionary với mapping chính xác cho tất cả các phiên bản Windows
+                Dictionary<string, string> winKeys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // Windows 11
+            {"Windows 11 Home", "TX9XD-98N7V-6WMQ6-BX7FG-H8Q99"},
+            {"Windows 11 Home N", "3KHY7-WNT83-DGQKR-F7HPR-844BM"},
+            {"Windows 11 Pro", "W269N-WFGWX-YVC9B-4J6C9-T83GX"},
+            {"Windows 11 Pro N", "MH37W-N47XK-V7XM9-C7227-GCQG9"},
+            {"Windows 11 Pro for Workstations", "NRG8B-VKK3Q-CXVCJ-9G2XF-6Q84J"},
+            {"Windows 11 Pro for Workstations N", "9FNHH-K3HBT-3W4TD-6383H-6XYWF"},
+            {"Windows 11 Enterprise", "NPPR9-FWDCX-D2C8J-H872K-2YT43"},
+            {"Windows 11 Enterprise N", "DPH2V-TTNVB-4X9Q3-TJR4H-KHJW4"},
+            {"Windows 11 Education", "NW6C2-QMPVW-D7KKK-3GKT6-VCFB2"},
+            {"Windows 11 Education N", "2WH4N-8QGBV-H22JP-CT43Q-MDWWJ"},
+            
+            // Windows 10
+            {"Windows 10 Home", "TX9XD-98N7V-6WMQ6-BX7FG-H8Q99"},
+            {"Windows 10 Home N", "3KHY7-WNT83-DGQKR-F7HPR-844BM"},
+            {"Windows 10 Pro", "W269N-WFGWX-YVC9B-4J6C9-T83GX"},
+            {"Windows 10 Pro N", "MH37W-N47XK-V7XM9-C7227-GCQG9"},
+            {"Windows 10 Pro for Workstations", "NRG8B-VKK3Q-CXVCJ-9G2XF-6Q84J"},
+            {"Windows 10 Pro for Workstations N", "9FNHH-K3HBT-3W4TD-6383H-6XYWF"},
+            {"Windows 10 Enterprise", "NPPR9-FWDCX-D2C8J-H872K-2YT43"},
+            {"Windows 10 Enterprise N", "DPH2V-TTNVB-4X9Q3-TJR4H-KHJW4"},
+            {"Windows 10 Education", "NW6C2-QMPVW-D7KKK-3GKT6-VCFB2"},
+            {"Windows 10 Education N", "2WH4N-8QGBV-H22JP-CT43Q-MDWWJ"},
+            
+            // Windows 8.1
+            {"Windows 8.1 Core", "M9Q9P-WNJJT-6PXPY-DWX8H-6XWKK"},
+            {"Windows 8.1 Core N", "7B9N3-D94CG-YTVHR-QBPX3-RJP64"},
+            {"Windows 8.1 Pro", "GCRJD-8NW9H-F2CDX-CCM8D-9D6T9"},
+            {"Windows 8.1 Pro N", "HMCNV-VVBFX-7HMBH-CTY9B-B4FXY"},
+            {"Windows 8.1 Enterprise", "MHF9N-XY6XB-WVXMC-BTDCT-MKKG7"},
+            {"Windows 8.1 Enterprise N", "TT4HM-HN7YT-62K67-RGRQJ-JFFXW"},
+            
+            // Windows 7
+            {"Windows 7 Home Basic", "FJ82H-XT6CR-J8D7P-XQJJ2-GPDD4"},
+            {"Windows 7 Home Premium", "HQRJW-XYQRP-JVBXW-GV3P3-M3B47"},
+            {"Windows 7 Professional", "FJ82H-XT6CR-J8D7P-XQJJ2-GPDD4"},
+            {"Windows 7 Enterprise", "33PXH-7Y6KF-2VJC9-XBBR8-HVTHH"},
+            {"Windows 7 Ultimate", "FJ82H-XT6CR-J8D7P-XQJJ2-GPDD4"}
+        };
+
+                // Chuẩn hóa productName
+                string normalizedProductName = productName.Trim();
+                SetStatus($"Đang xác định phiên bản: {normalizedProductName}", InfoBarSeverity.Informational);
+
+                // Tìm key chính xác
+                string key = "";
+                bool foundExactMatch = false;
+
+                // Tìm kiếm chính xác trong dictionary
+                foreach (var winVersion in winKeys.Keys)
+                {
+                    if (normalizedProductName.Equals(winVersion, StringComparison.OrdinalIgnoreCase) ||
+                        normalizedProductName.Contains(winVersion, StringComparison.OrdinalIgnoreCase))
+                    {
+                        key = winKeys[winVersion];
+                        foundExactMatch = true;
+                        SetStatus($"Đã tìm thấy key cho: {winVersion}", InfoBarSeverity.Success);
+                        break;
+                    }
+                }
+
+                // Nếu không tìm thấy exact match, phân tích tự động
+                if (!foundExactMatch)
+                {
+                    SetStatus("Đang phân tích phiên bản Windows...", InfoBarSeverity.Warning);
+
+                    // Xác định các thông tin từ productName
+                    bool isWindows11 = normalizedProductName.Contains("11", StringComparison.OrdinalIgnoreCase);
+                    bool isWindows10 = normalizedProductName.Contains("10", StringComparison.OrdinalIgnoreCase);
+                    bool isWindows8 = normalizedProductName.Contains("8", StringComparison.OrdinalIgnoreCase);
+                    bool isWindows7 = normalizedProductName.Contains("7", StringComparison.OrdinalIgnoreCase);
+
+                    // Xác định edition
+                    bool isHomeEdition = normalizedProductName.Contains("Home", StringComparison.OrdinalIgnoreCase) ||
+                                        normalizedProductName.Contains("Core", StringComparison.OrdinalIgnoreCase);
+
+                    bool isProEdition = normalizedProductName.Contains("Professional", StringComparison.OrdinalIgnoreCase) ||
+                                       normalizedProductName.Contains("Pro", StringComparison.OrdinalIgnoreCase) ||
+                                       normalizedProductName.Contains("Business", StringComparison.OrdinalIgnoreCase);
+
+                    bool isEnterpriseEdition = normalizedProductName.Contains("Enterprise", StringComparison.OrdinalIgnoreCase);
+                    bool isEducationEdition = normalizedProductName.Contains("Education", StringComparison.OrdinalIgnoreCase);
+                    bool isUltimateEdition = normalizedProductName.Contains("Ultimate", StringComparison.OrdinalIgnoreCase);
+                    bool isWorkstationEdition = normalizedProductName.Contains("Workstation", StringComparison.OrdinalIgnoreCase);
+                    bool hasN = normalizedProductName.Contains(" N", StringComparison.OrdinalIgnoreCase) ||
+                               normalizedProductName.EndsWith(" N", StringComparison.OrdinalIgnoreCase);
+
+                    // Chọn key dựa trên phiên bản và edition
+                    if (isEnterpriseEdition)
+                    {
+                        key = hasN ? "DPH2V-TTNVB-4X9Q3-TJR4H-KHJW4" : "NPPR9-FWDCX-D2C8J-H872K-2YT43";
+                        SetStatus($"Đã xác định: Windows {(isWindows11 ? "11" : isWindows10 ? "10" : "")} Enterprise Edition", InfoBarSeverity.Informational);
+                    }
+                    else if (isEducationEdition)
+                    {
+                        key = hasN ? "2WH4N-8QGBV-H22JP-CT43Q-MDWWJ" : "NW6C2-QMPVW-D7KKK-3GKT6-VCFB2";
+                        SetStatus($"Đã xác định: Windows {(isWindows11 ? "11" : isWindows10 ? "10" : "")} Education Edition", InfoBarSeverity.Informational);
+                    }
+                    else if (isWorkstationEdition)
+                    {
+                        key = hasN ? "9FNHH-K3HBT-3W4TD-6383H-6XYWF" : "NRG8B-VKK3Q-CXVCJ-9G2XF-6Q84J";
+                        SetStatus($"Đã xác định: Windows {(isWindows11 ? "11" : isWindows10 ? "10" : "")} Pro for Workstations", InfoBarSeverity.Informational);
+                    }
+                    else if (isProEdition || isUltimateEdition)
+                    {
+                        key = hasN ? "MH37W-N47XK-V7XM9-C7227-GCQG9" : "W269N-WFGWX-YVC9B-4J6C9-T83GX";
+                        SetStatus($"Đã xác định: Windows {(isWindows11 ? "11" : isWindows10 ? "10" : "")} Professional Edition", InfoBarSeverity.Informational);
+                    }
+                    else if (isHomeEdition)
+                    {
+                        key = hasN ? "3KHY7-WNT83-DGQKR-F7HPR-844BM" : "TX9XD-98N7V-6WMQ6-BX7FG-H8Q99";
+                        SetStatus($"Đã xác định: Windows {(isWindows11 ? "11" : isWindows10 ? "10" : "")} Home Edition", InfoBarSeverity.Informational);
+                    }
+                    else
+                    {
+                        // Mặc định sử dụng Professional key (phổ biến nhất)
+                        key = "W269N-WFGWX-YVC9B-4J6C9-T83GX";
+                        SetStatus($"Không xác định rõ edition, sử dụng key mặc định", InfoBarSeverity.Warning);
+                    }
+                }
+
+                // Kiểm tra và đề xuất chuyển edition nếu cần
+                await CheckAndConvertEditionIfNeeded(productName, key);
+
+                SetStatus($"Đang cài đặt Product Key...", InfoBarSeverity.Informational);
+
+                // Danh sách KMS servers
+                string[] kmsServers = {
+            "kms8.msguides.com",
+            "kms.chinancce.com",
+            "kms.digiboy.ir",
+            "kms.lotro.cc",
+            "kms.srv.crsoo.com",
+            "kms.03k.org"
+        };
+
+                // Bước 1: Gỡ bỏ key hiện tại trước (nếu có)
+                await ExecuteSlmgrCommand("/upk");
+
+                // Bước 2: Cài đặt key mới
+                bool installKeySuccess = await ExecuteSlmgrCommand($"/ipk {key}");
+
+                if (!installKeySuccess)
+                {
+                    // Thử sửa lỗi edition mismatch
+                    SetStatus("Đang thử sửa lỗi không khớp edition...", InfoBarSeverity.Warning);
+                    bool fixSuccess = await FixEditionMismatch(productName);
+
+                    if (!fixSuccess)
+                    {
+                        SetStatus("Lỗi cài đặt product key!", InfoBarSeverity.Error);
+                        await ShowInfoDialogAsync("Lỗi",
+                            $"Không thể cài đặt product key cho phiên bản: {productName}\n\n" +
+                            "Nguyên nhân có thể:\n" +
+                            "1. Phiên bản Windows không hỗ trợ KMS\n" +
+                            "2. Cần chuyển đổi edition trước\n" +
+                            "3. Product key không phù hợp\n\n" +
+                            "Hãy thử:\n" +
+                            "1. Kiểm tra lại phiên bản Windows\n" +
+                            "2. Sử dụng phương pháp HWID cho Windows Home\n" +
+                            "3. Sử dụng 'Đổi phiên bản' trong công cụ");
+                        return false;
+                    }
+                }
+
+                // Bước 3: Thiết lập KMS server
+                bool setKmsSuccess = false;
+                foreach (var kmsServer in kmsServers)
+                {
+                    SetStatus($"Đang thử KMS server: {kmsServer}...", InfoBarSeverity.Warning);
+                    setKmsSuccess = await ExecuteSlmgrCommand($"/skms {kmsServer}");
+
+                    if (setKmsSuccess)
+                    {
+                        SetStatus($"Đã kết nối đến KMS server: {kmsServer}", InfoBarSeverity.Success);
+                        break;
+                    }
+                }
+
+                if (!setKmsSuccess)
+                {
+                    SetStatus("Không thể kết nối đến bất kỳ KMS server nào!", InfoBarSeverity.Error);
+                    return false;
+                }
+
+                // Bước 4: Kích hoạt
+                SetStatus("Đang kích hoạt Windows...", InfoBarSeverity.Warning);
+                bool activateSuccess = await ExecuteSlmgrCommand("/ato");
+
+                if (!activateSuccess)
+                {
+                    // Thử lại với phương pháp khác
+                    SetStatus("Đang thử kích hoạt lại...", InfoBarSeverity.Warning);
+
+                    // Reset và thử lại
+                    await ExecuteSlmgrCommand("/rearm");
+                    await Task.Delay(2000);
+
+                    activateSuccess = await ExecuteSlmgrCommand("/ato");
+
+                    if (!activateSuccess)
+                    {
+                        // Kiểm tra lỗi cụ thể
+                        await CheckActivationStatus();
+
+                        // Hiển thị hướng dẫn chi tiết
+                        await ShowInfoDialogAsync("Lỗi kích hoạt",
+                            $"Không thể kích hoạt Windows phiên bản: {productName}\n\n" +
+                            "Các giải pháp:\n" +
+                            "1. Kiểm tra kết nối Internet\n" +
+                            "2. Thử phương pháp HWID thay vì KMS\n" +
+                            "3. Chạy 'Khắc phục sự cố' trong công cụ\n" +
+                            "4. Thử kích hoạt thủ công bằng lệnh:\n" +
+                            $"   slmgr /ipk {key}\n" +
+                            "   slmgr /skms kms8.msguides.com\n" +
+                            "   slmgr /ato");
+
+                        return false;
+                    }
+                }
+
+                // Bước 5: Kiểm tra trạng thái kích hoạt
+                if (activateSuccess)
+                {
+                    await Task.Delay(3000);
+                    bool statusSuccess = await CheckActivationStatus2();
+
+                    if (statusSuccess)
+                    {
+                        SetStatus("Windows đã được kích hoạt thành công!", InfoBarSeverity.Success);
+                        await ShowInfoDialogAsync("Thành công",
+                            $"Windows đã được kích hoạt thành công!\n\n" +
+                            $"Phiên bản: {productName}\n" +
+                            $"Phương pháp: Online KMS (180 ngày)\n\n" +
+                            "Kích hoạt sẽ tự động gia hạn mỗi 180 ngày.");
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi KMS: {ex.Message}", InfoBarSeverity.Error);
+                await ShowInfoDialogAsync("Lỗi", $"Lỗi khi kích hoạt Windows:\n\n{ex.Message}");
+                return false;
+            }
+        }
+
+        private async Task<bool> CheckAndConvertEditionIfNeeded(string productName, string targetKey)
+        {
+            try
+            {
+                // Kiểm tra xem có cần chuyển edition không
+                // Ví dụ: từ Core/Home lên Professional
+                if (productName.Contains("Home", StringComparison.OrdinalIgnoreCase) ||
+                    productName.Contains("Core", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (targetKey == "W269N-WFGWX-YVC9B-4J6C9-T83GX") // Professional key
+                    {
+                        SetStatus("Đang nâng cấp từ Home/Core lên Professional...", InfoBarSeverity.Warning);
+
+                        // Sử dụng changepk.exe để thay đổi product key và edition
+                        string changePkCommand = $"/ProductKey {targetKey}";
+                        bool changeSuccess = await RunProcessCheckSuccess("changepk.exe", changePkCommand);
+
+                        if (changeSuccess)
+                        {
+                            SetStatus("Đã yêu cầu nâng cấp edition. Cần khởi động lại!", InfoBarSeverity.Success);
+                            await ShowInfoDialogAsync("Thông báo",
+                                "Để hoàn tất nâng cấp lên phiên bản Professional, cần khởi động lại máy tính.");
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi chuyển edition: {ex.Message}", InfoBarSeverity.Error);
+                return false;
+            }
+        }
+
+        private async Task<bool> CheckActivationStatus2()
+        {
+            try
+            {
+                SetStatus("Đang kiểm tra trạng thái kích hoạt...", InfoBarSeverity.Informational);
+
+                // Kiểm tra bằng slmgr
+                bool status = await ExecuteSlmgrCommand("/xpr"); // Hiển thị thời hạn
+                await Task.Delay(1000);
+                await ExecuteSlmgrCommand("/dlv"); // Hiển thị chi tiết
+
+                return status;
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi kiểm tra trạng thái: {ex.Message}", InfoBarSeverity.Error);
+                return false;
+            }
+        }
+
+        private async Task<bool> ExecuteSlmgrCommand(string arguments)
+        {
+            try
+            {
+                string systemRoot = Environment.GetEnvironmentVariable("SystemRoot");
+                if (string.IsNullOrEmpty(systemRoot))
+                {
+                    systemRoot = @"C:\Windows";
+                }
+
+                string slmgrPath = Path.Combine(systemRoot, "System32", "slmgr.vbs");
+
+                if (!File.Exists(slmgrPath))
+                {
+                    SetStatus("Không tìm thấy slmgr.vbs!", InfoBarSeverity.Error);
+                    return false;
+                }
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "cscript.exe",
+                    Arguments = $"//Nologo \"{slmgrPath}\" {arguments}",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    WorkingDirectory = Path.Combine(systemRoot, "System32")
+                };
+
+                using (var process = new Process { StartInfo = psi })
+                {
+                    process.Start();
+
+                    string output = await process.StandardOutput.ReadToEndAsync();
+                    string error = await process.StandardError.ReadToEndAsync();
+
+                    await Task.Run(() => process.WaitForExit(30000));
+
+                    // Xử lý output để kiểm tra thành công
+                    bool success = process.ExitCode == 0;
+
+                    // Kiểm tra các thông báo lỗi phổ biến
+                    if (output.Contains("0xC004F069") || output.Contains("non-core edition"))
+                    {
+                        SetStatus("Lỗi: Không thể kích hoạt phiên bản này với key hiện tại. Cần đúng edition!", InfoBarSeverity.Error);
+                        return false;
+                    }
+
+                    if (output.Contains("0x8007007B") || output.Contains("0xC004C003"))
+                    {
+                        SetStatus("Lỗi: Product key không hợp lệ hoặc đã hết hạn!", InfoBarSeverity.Error);
+                        return false;
+                    }
+
+                    if (output.Contains("successfully") ||
+                        output.Contains("Product activated successfully") ||
+                        output.Contains("Key Management Service") ||
+                        output.Contains("will expire"))
+                    {
+                        success = true;
+                    }
+
+                    if (output.Contains("Error") || output.Contains("failed"))
+                    {
+                        success = false;
+                    }
+
+                    if (!success)
+                    {
+                        string errorMsg = !string.IsNullOrEmpty(error) ? error : output;
+
+                        // Hiển thị thông báo lỗi chi tiết
+                        if (errorMsg.Contains("0xC004F069"))
+                        {
+                            SetStatus("Lỗi: Phiên bản Windows không khớp với product key!", InfoBarSeverity.Error);
+                            await ShowInfoDialogAsync("Lỗi kích hoạt",
+                                "Lỗi 0xC004F069: Phiên bản Windows hiện tại không tương thích với product key được cài đặt.\n\n" +
+                                "Nguyên nhân:\n" +
+                                "1. Đang cố gắng kích hoạt Windows Home bằng key Professional\n" +
+                                "2. Đang cố gắng kích hoạt Windows Pro bằng key Enterprise\n" +
+                                "3. Key không đúng cho edition hiện tại\n\n" +
+                                "Giải pháp:\n" +
+                                "1. Kiểm tra phiên bản Windows chính xác\n" +
+                                "2. Sử dụng đúng key cho phiên bản đó\n" +
+                                "3. Nâng cấp edition nếu cần");
+                        }
+                        else
+                        {
+                            SetStatus($"slmgr: {errorMsg.Trim()}", InfoBarSeverity.Warning);
+                        }
+                    }
+                    else
+                    {
+                        SetStatus($"slmgr: Thành công", InfoBarSeverity.Success);
+                    }
+
+                    return success;
+                }
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi thực thi slmgr: {ex.Message}", InfoBarSeverity.Error);
+                return false;
+            }
+        }
+
+        // Phương thức mới: Tự động phát hiện và sửa lỗi edition
+        private async Task<bool> FixEditionMismatch(string currentProductName)
+        {
+            try
+            {
+                SetStatus("Đang xử lý lỗi không khớp edition...", InfoBarSeverity.Warning);
+
+                // Phát hiện edition hiện tại
+                string detectedEdition = DetectWindowsEdition(currentProductName);
+
+                // Lấy key phù hợp cho edition hiện tại
+                string correctKey = GetKeyForEdition(detectedEdition);
+
+                if (string.IsNullOrEmpty(correctKey))
+                {
+                    SetStatus("Không thể xác định key phù hợp!", InfoBarSeverity.Error);
+                    return false;
+                }
+
+                // Cài đặt key đúng
+                SetStatus($"Đang cài đặt key phù hợp cho {detectedEdition}...", InfoBarSeverity.Informational);
+                return await ExecuteSlmgrCommand($"/ipk {correctKey}");
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi sửa edition: {ex.Message}", InfoBarSeverity.Error);
+                return false;
+            }
+        }
+
+        private string DetectWindowsEdition(string productName)
+        {
+            if (productName.Contains("Enterprise", StringComparison.OrdinalIgnoreCase))
+                return "Enterprise";
+            if (productName.Contains("Professional", StringComparison.OrdinalIgnoreCase) ||
+                productName.Contains("Pro", StringComparison.OrdinalIgnoreCase))
+                return "Professional";
+            if (productName.Contains("Home", StringComparison.OrdinalIgnoreCase) ||
+                productName.Contains("Core", StringComparison.OrdinalIgnoreCase))
+                return "Home";
+            if (productName.Contains("Education", StringComparison.OrdinalIgnoreCase))
+                return "Education";
+
+            return "Unknown";
+        }
+
+        private string GetKeyForEdition(string edition)
+        {
+            return edition.ToLower() switch
+            {
+                "enterprise" => "NPPR9-FWDCX-D2C8J-H872K-2YT43",
+                "professional" or "pro" => "W269N-WFGWX-YVC9B-4J6C9-T83GX",
+                "home" or "core" => "TX9XD-98N7V-6WMQ6-BX7FG-H8Q99",
+                "education" => "NW6C2-QMPVW-D7KKK-3GKT6-VCFB2",
+                _ => "W269N-WFGWX-YVC9B-4J6C9-T83GX" // Mặc định là Professional
+            };
+        }
+
+        // THÊM PHƯƠNG THỨC ActivateWindowsServerWithKMS với tham số
+        private async Task<bool> ActivateWindowsServerWithKMS(string productName)
+        {
+            try
+            {
+                Dictionary<string, string> serverKeys = new Dictionary<string, string>()
+                {
+                    {"Windows Server 2022 Standard", "VDYBN-27WPP-V4HQT-9VMD4-VMK7H"},
+                    {"Windows Server 2022 Datacenter", "WX4NM-KYWYW-QJJR4-XV3QB-6VM33"},
+                    {"Windows Server 2019 Standard", "N69G4-B89J2-4G8F4-WWYCC-J464C"},
+                    {"Windows Server 2019 Datacenter", "WMDGN-G9PQG-XVVXX-R3X43-63DFG"},
+                    {"Windows Server 2016 Standard", "WC2BQ-8NRM3-FDDYY-2BFGV-KHKQY"},
+                    {"Windows Server 2016 Datacenter", "CB7KF-BWN84-R7R2Y-793K2-8XDDG"},
+                    {"Windows Server 2012 R2 Standard", "D2N9P-3P6X9-2R39C-7RTCD-MDVJX"},
+                    {"Windows Server 2012 R2 Datacenter", "W3GGN-FT8W3-Y4M27-J84CP-Q3VJ9"},
+                    {"Windows Server 2008 R2 Standard", "YC6KT-GKW9T-YTKYR-T4X34-R7VHC"},
+                    {"Windows Server 2008 R2 Datacenter", "74YFP-3QFB3-KQT8W-PMXWJ-7M648"},
+                    {"Windows Server 2008 R2 Enterprise", "489J6-VHDMP-X63PK-3K798-CPX3Y"}
+                };
+
+                string key = "";
+                foreach (var serverVersion in serverKeys.Keys)
+                {
+                    if (productName.Contains(serverVersion))
+                    {
+                        key = serverKeys[serverVersion];
+                        break;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(key))
+                {
+                    if (productName.ToLower().Contains("evaluation"))
+                    {
+                        SetStatus("Đang chuyển đổi Evaluation version...", InfoBarSeverity.Warning);
+
+                        string edition = "";
+                        if (productName.Contains("Standard")) edition = "Standard";
+                        else if (productName.Contains("Datacenter")) edition = "Datacenter";
+                        else if (productName.Contains("Enterprise")) edition = "Enterprise";
+
+                        if (!string.IsNullOrEmpty(edition))
+                        {
+                            string serverKey = GetServerKeyByEdition(edition);
+                            string args = $"/online /set-edition:Server{edition} /productkey:{serverKey} /accepteula";
+                            bool dismResult = await RunProcessCheckSuccess("dism.exe", args);
+
+                            if (dismResult)
+                            {
+                                SetStatus("Yêu cầu khởi động lại để hoàn tất!", InfoBarSeverity.Success);
+                                await ShowInfoDialogAsync("Thông báo",
+                                    "Để nâng cấp lên phiên bản có bản quyền, cần khởi động lại máy tính.");
+                                return true;
+                            }
+                        }
+                    }
+
+                    if (productName.Contains("Standard"))
+                        key = "VDYBN-27WPP-V4HQT-9VMD4-VMK7H";
+                    else if (productName.Contains("Datacenter"))
+                        key = "WX4NM-KYWYW-QJJR4-XV3QB-6VM33";
+                    else if (productName.Contains("Enterprise"))
+                        key = "489J6-VHDMP-X63PK-3K798-CPX3Y";
+                    else
+                    {
+                        SetStatus($"Phiên bản Server không được hỗ trợ: {productName}", InfoBarSeverity.Error);
+                        return false;
+                    }
+                }
+
+                SetStatus($"Đang cài đặt Product Key cho {productName}...", InfoBarSeverity.Informational);
+
+                string[] kmsServers = {
+                    "kms8.msguides.com",
+                    "kms.chinancce.com",
+                    "kms.digiboy.ir",
+                    "kms.lotro.cc"
+                };
+
+                bool installKeySuccess = await ExecuteSlmgrCommand($"/ipk {key}");
+
+                if (!installKeySuccess)
+                {
+                    SetStatus("Lỗi cài đặt product key!", InfoBarSeverity.Error);
+                    return false;
+                }
+
+                bool setKmsSuccess = false;
+                foreach (var kmsServer in kmsServers)
+                {
+                    SetStatus($"Đang thử KMS server: {kmsServer}...", InfoBarSeverity.Warning);
+                    setKmsSuccess = await ExecuteSlmgrCommand($"/skms {kmsServer}");
+
+                    if (setKmsSuccess)
+                    {
+                        SetStatus($"Đã kết nối đến KMS server: {kmsServer}", InfoBarSeverity.Success);
+                        break;
+                    }
+                }
+
+                if (!setKmsSuccess)
+                {
+                    SetStatus("Không thể kết nối đến bất kỳ KMS server nào!", InfoBarSeverity.Error);
+                    return false;
+                }
+
+                SetStatus("Đang kích hoạt Windows Server...", InfoBarSeverity.Warning);
+                bool activateSuccess = await ExecuteSlmgrCommand("/ato");
+
+                if (activateSuccess)
+                {
+                    await Task.Delay(2000);
+                    await ExecuteSlmgrCommand("/dlv");
+                    return true;
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi KMS Server: {ex.Message}", InfoBarSeverity.Error);
+                return false;
+            }
+        }
+
+        // THÊM PHƯƠNG THỨC GetServerKeyByEdition
+        private string GetServerKeyByEdition(string edition)
+        {
+            return edition.ToLower() switch
+            {
+                "standard" => "VDYBN-27WPP-V4HQT-9VMD4-VMK7H",
+                "datacenter" => "WX4NM-KYWYW-QJJR4-XV3QB-6VM33",
+                "enterprise" => "489J6-VHDMP-X63PK-3K798-CPX3Y",
+                _ => "VDYBN-27WPP-V4HQT-9VMD4-VMK7H"
+            };
+        }
+
+        // THÊM PHƯƠNG THỨC ActivateOfficeWithKMS
+        private async Task<bool> ActivateOfficeWithKMS()
+        {
+            try
+            {
+                string officePath = FindOfficePath();
+
+                if (string.IsNullOrEmpty(officePath))
+                {
+                    SetStatus("Không tìm thấy Office!", InfoBarSeverity.Error);
+                    return false;
+                }
+
+                string kmsServer = "kms8.msguides.com";
+
+                Dictionary<string, string> officeKeys = new Dictionary<string, string>()
+                {
+                    {"Office 2021 Professional Plus", "FXYTK-NJJ8C-GB6DW-3DYQT-6F7TH"},
+                    {"Office 2021 Standard", "KDX7X-BNVR8-TXXGX-4Q7Y8-78VT3"},
+                    {"Office 2019 Professional Plus", "NMMKJ-6RK4F-KMJVX-8D9MJ-6MWKP"},
+                    {"Office 2019 Standard", "6NWWJ-YQWMR-QKGCB-6TMB3-9D9HK"},
+                    {"Office 2016 Professional Plus", "XQNVK-8JYDB-WJ9W3-YJ8YR-WFG99"},
+                    {"Office 2016 Standard", "JNRGM-WHDWX-FJJG3-K47QV-DRTFM"}
+                };
+
+                string officeVersion = DetectOfficeVersion();
+                string officeKey = officeKeys.ContainsKey(officeVersion) ? officeKeys[officeVersion] : "XQNVK-8JYDB-WJ9W3-YJ8YR-WFG99";
+
+                SetStatus($"Đang kích hoạt {officeVersion}...", InfoBarSeverity.Informational);
+
+                bool step1 = await ExecuteOfficeCommand($"/inpkey:{officeKey}");
+                bool step2 = await ExecuteOfficeCommand($"/sethst:{kmsServer}");
+                bool step3 = await ExecuteOfficeCommand("/act");
+
+                if (step1 && step2 && step3)
+                {
+                    await Task.Delay(1000);
+                    await ExecuteOfficeCommand("/dstatus");
+                    return true;
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi Office KMS: {ex.Message}", InfoBarSeverity.Error);
+                return false;
+            }
+        }
+
+        // THÊM PHƯƠNG THỨC ActivateWithHWID
+        private async Task<bool> ActivateWithHWID()
+        {
+            try
+            {
+                SetStatus("Đang kích hoạt bằng HWID...", InfoBarSeverity.Informational);
+
+                string productName = GetWindowsProductName();
+                string key = "";
+
+                if (productName.Contains("Home") || productName.Contains("11") || productName.Contains("10"))
+                {
+                    key = "TX9XD-98N7V-6WMQ6-BX7FG-H8Q99";
+                }
+                else if (productName.Contains("Professional") || productName.Contains("Pro"))
+                {
+                    key = "W269N-WFGWX-YVC9B-4J6C9-T83GX";
+                }
+                else if (productName.Contains("Enterprise"))
+                {
+                    key = "NPPR9-FWDCX-D2C8J-H872K-2YT43";
+                }
+                else
+                {
+                    key = "W269N-WFGWX-YVC9B-4J6C9-T83GX";
+                }
+
+                bool step1 = await ExecuteSlmgrCommand($"/ipk {key}");
+                bool step2 = await ExecuteSlmgrCommand("/ato");
+
+                if (step1 && step2)
+                {
+                    await Task.Delay(2000);
+                    await ExecuteSlmgrCommand("/dlv");
+                    return true;
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi HWID: {ex.Message}", InfoBarSeverity.Error);
+                return false;
+            }
+        }
+
+        // THÊM PHƯƠNG THỨC ActivateWithOhook
+        private async Task<bool> ActivateWithOhook()
+        {
+            try
+            {
+                SetStatus("Đang chuẩn bị Ohook...", InfoBarSeverity.Informational);
+
+                string officePath = FindOfficePath();
+                if (string.IsNullOrEmpty(officePath))
+                {
+                    SetStatus("Không tìm thấy Office!", InfoBarSeverity.Error);
+                    return false;
+                }
+
+                try
+                {
+                    string ohookUrl = "https://github.com/asdcorp/ohook/releases/latest/download/ohook.dll";
+                    string ohookPath = Path.Combine(officePath, "ohook.dll");
+
+                    SetStatus("Đang tải ohook.dll...", InfoBarSeverity.Warning);
+
+                    using (var client = new System.Net.WebClient())
+                    {
+                        await client.DownloadFileTaskAsync(new Uri(ohookUrl), ohookPath);
+                    }
+
+                    if (!File.Exists(ohookPath))
+                    {
+                        SetStatus("Không thể tải ohook.dll!", InfoBarSeverity.Error);
+                        return false;
+                    }
+
+                    SetStatus("Đang đăng ký ohook...", InfoBarSeverity.Warning);
+                    bool registerSuccess = await RunProcessCheckSuccess("regsvr32.exe", $"/s \"{ohookPath}\"");
+
+                    if (registerSuccess)
+                    {
+                        SetStatus("Ohook đã được cài đặt thành công!", InfoBarSeverity.Success);
+                        await ShowInfoDialogAsync("Thành công", "Office đã được kích hoạt bằng Ohook. Khởi động lại Office để áp dụng.");
+                        return true;
+                    }
+                }
+                catch (System.Net.WebException webEx)
+                {
+                    SetStatus($"Không thể tải ohook: {webEx.Message}", InfoBarSeverity.Error);
+                    return false;
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi Ohook: {ex.Message}", InfoBarSeverity.Error);
+                return false;
+            }
+        }
+
+        private async Task<bool> ExecuteOfficeCommand(string arguments)
+        {
+            try
+            {
+                string officePath = FindOfficePath();
+                if (string.IsNullOrEmpty(officePath))
+                {
+                    SetStatus("Không tìm thấy Office!", InfoBarSeverity.Error);
+                    return false;
+                }
+
+                string osppPath = Path.Combine(officePath, "ospp.vbs");
+
+                if (!File.Exists(osppPath))
+                {
+                    string systemRoot = Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows";
+                    osppPath = Path.Combine(systemRoot, "System32", "ospp.vbs");
+                }
+
+                if (!File.Exists(osppPath))
+                {
+                    SetStatus("Không tìm thấy ospp.vbs!", InfoBarSeverity.Error);
+                    return false;
+                }
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "cscript.exe",
+                    Arguments = $"//Nologo \"{osppPath}\" {arguments}",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    WorkingDirectory = officePath
+                };
+
+                using (var process = new Process { StartInfo = psi })
+                {
+                    process.Start();
+                    string output = await process.StandardOutput.ReadToEndAsync();
+                    string error = await process.StandardError.ReadToEndAsync();
+                    await Task.Run(() => process.WaitForExit(30000));
+
+                    bool success = process.ExitCode == 0 &&
+                                   !output.Contains("ERROR") &&
+                                   !output.Contains("failed") &&
+                                   (output.Contains("successful") ||
+                                    output.Contains("activated") ||
+                                    output.Contains("Product activation successful"));
+
+                    if (!success)
+                    {
+                        string errorMsg = !string.IsNullOrEmpty(error) ? error : output;
+                        SetStatus($"Office: {errorMsg.Trim()}", InfoBarSeverity.Warning);
+                    }
+                    else
+                    {
+                        SetStatus($"Office: Thành công", InfoBarSeverity.Success);
+                    }
+
+                    return success;
+                }
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi Office command: {ex.Message}", InfoBarSeverity.Error);
+                return false;
+            }
+        }
+
+        // THÊM PHƯƠNG THỨC RunProcessAsync
+        private async Task<string> RunProcessAsync(string fileName, string arguments)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using (var process = new Process { StartInfo = psi })
+                {
+                    process.Start();
+                    string output = await process.StandardOutput.ReadToEndAsync();
+                    string error = await process.StandardError.ReadToEndAsync();
+                    await Task.Run(() => process.WaitForExit(30000));
+
+                    if (process.ExitCode == 0)
+                    {
+                        return output;
+                    }
+                    else
+                    {
+                        return $"Error: {error}";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"Exception: {ex.Message}";
+            }
+        }
+
+        // THÊM PHƯƠNG THỨC RunProcessCheckSuccess
+        private async Task<bool> RunProcessCheckSuccess(string fileName, string arguments)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using (var process = new Process { StartInfo = psi })
+                {
+                    process.Start();
+                    await Task.Run(() => process.WaitForExit(30000));
+                    return process.ExitCode == 0;
+                }
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        // THÊM PHƯƠNG THỨC FindOfficePath
+        private string FindOfficePath()
+        {
+            string[] possiblePaths = {
+                @"C:\Program Files\Microsoft Office\Office16",
+                @"C:\Program Files (x86)\Microsoft Office\Office16",
+                @"C:\Program Files\Microsoft Office\Office15",
+                @"C:\Program Files (x86)\Microsoft Office\Office15",
+                @"C:\Program Files\Microsoft Office\Office14",
+                @"C:\Program Files (x86)\Microsoft Office\Office14",
+                @"C:\Program Files\Microsoft Office\root\Office16",
+                @"C:\Program Files (x86)\Microsoft Office\root\Office16"
+            };
+
+            foreach (var path in possiblePaths)
+            {
+                if (Directory.Exists(path) && File.Exists(Path.Combine(path, "winword.exe")))
+                {
+                    return path;
+                }
+            }
+
+            return null;
+        }
+
+        // THÊM PHƯƠNG THỨC DetectOfficeVersion
+        private string DetectOfficeVersion()
+        {
+            string officePath = FindOfficePath();
+            if (string.IsNullOrEmpty(officePath)) return "Unknown";
+
+            if (officePath.Contains("Office16")) return "Office 2021/2019";
+            if (officePath.Contains("Office15")) return "Office 2013";
+            if (officePath.Contains("Office14")) return "Office 2010";
+
+            return "Office Unknown Version";
+        }
+
         private async void BtnRemoveActivation_Click(object sender, RoutedEventArgs e)
         {
             var result = await new Wpf.Ui.Controls.MessageBox
@@ -1147,6 +2116,7 @@ del ""%~f0"" & exit";
             }
         }
 
+        // THÊM PHƯƠNG THỨC RemoveAllActivations
         private async Task RemoveAllActivations()
         {
             try
@@ -1154,13 +2124,9 @@ del ""%~f0"" & exit";
                 ShowBusy("Đang gỡ bỏ kích hoạt...");
                 SetStatus("Đang gỡ bỏ kích hoạt...", InfoBarSeverity.Warning);
                 DisableButtons();
-                
 
-                // AppendOutput("=== Bắt đầu gỡ bỏ kích hoạt ===\n");
-                
-                // Remove Ohook and KMS
                 string psCommand = "irm https://massgrave.dev/get | iex; ohook /r; kms /r";
-                
+
                 var psi = new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
@@ -1175,14 +2141,19 @@ del ""%~f0"" & exit";
                     process.Start();
                     await Task.Run(() => process.WaitForExit());
 
-                    SetStatus("Đã gỡ bỏ kích hoạt", InfoBarSeverity.Success);
-                    // AppendOutput("\n=== Hoàn thành gỡ bỏ ===\n");
+                    if (process.ExitCode == 0)
+                    {
+                        SetStatus("Đã gỡ bỏ kích hoạt", InfoBarSeverity.Success);
+                    }
+                    else
+                    {
+                        SetStatus("Gỡ bỏ không thành công", InfoBarSeverity.Error);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 SetStatus("Lỗi: " + ex.Message, InfoBarSeverity.Error);
-                // AppendOutput($"\n[EXCEPTION] {ex.Message}\n");
             }
             finally
             {
@@ -2188,37 +3159,103 @@ reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"" /v
         {
             try
             {
-                var confirmed = await ShowConfirmDialogAsync($"Tải {appName}", $"Tải xuống {appName}?\n\nFile sẽ được lưu vào Desktop.");
+                var confirmed = await ShowConfirmDialogAsync($"Tải và cài đặt {appName}", $"Tải xuống và cài đặt {appName}?\n\nFile sẽ được tải và giải nén tự động.");
                 if (!confirmed) return;
 
                 ShowBusy($"Đang tải {appName}...");
-                
+
                 using (var httpClient = new HttpClient())
                 {
                     httpClient.Timeout = TimeSpan.FromMinutes(5);
-                    
+
                     var fileBytes = await httpClient.GetByteArrayAsync(url);
-                    var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                    var filePath = Path.Combine(desktopPath, fileName);
-                    
-                    File.WriteAllBytes(filePath, fileBytes);
-                    
-                    HideBusy();
-                    ShowSnackbar("Thành công", $"Đã tải {appName} về Desktop", ControlAppearance.Success);
-                    
-                    // Open folder
-                    Process.Start(new ProcessStartInfo
+                    var tempPath = Path.Combine(Path.GetTempPath(), fileName);
+                    var extractPath = Path.Combine(Path.GetTempPath(), $"Extract_{Guid.NewGuid()}");
+
+                    // Save file
+                    await File.WriteAllBytesAsync(tempPath, fileBytes);
+
+                    ShowBusy($"Đang giải nén {appName}...");
+
+                    // Extract if it's a zip file
+                    if (fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
                     {
-                        FileName = "explorer.exe",
-                        Arguments = $"/select,\"{filePath}\"",
-                        UseShellExecute = true
-                    });
+                        System.IO.Compression.ZipFile.ExtractToDirectory(tempPath, extractPath);
+
+                        // Find and execute .exe or .msi files
+                        ShowBusy($"Đang cài đặt {appName}...");
+
+                        var exeFiles = Directory.GetFiles(extractPath, "*.exe", SearchOption.AllDirectories);
+                        var msiFiles = Directory.GetFiles(extractPath, "*.msi", SearchOption.AllDirectories);
+
+                        string installFile = exeFiles.FirstOrDefault() ?? msiFiles.FirstOrDefault();
+
+                        if (!string.IsNullOrEmpty(installFile))
+                        {
+                            var process = new Process
+                            {
+                                StartInfo = new ProcessStartInfo
+                                {
+                                    FileName = installFile,
+                                    UseShellExecute = true,
+                                    Verb = "runas",
+                                    WindowStyle = ProcessWindowStyle.Normal
+                                }
+                            };
+                            process.Start();
+                            await Task.Run(() => process.WaitForExit());
+
+                            HideBusy();
+                            ShowSnackbar("Thành công", $"Đã cài đặt {appName} thành công!", ControlAppearance.Success);
+                            await ShowInfoDialogAsync("Hoàn thành", $"{appName} đã được cài đặt thành công!");
+                        }
+                        else
+                        {
+                            HideBusy();
+                            ShowSnackbar("Cảnh báo", "Không tìm thấy file cài đặt (.exe/.msi) trong zip", ControlAppearance.Caution);
+
+                            // Open extracted folder
+                            Process.Start(new ProcessStartInfo
+                            {
+                                FileName = "explorer.exe",
+                                Arguments = extractPath,
+                                UseShellExecute = true
+                            });
+                        }
+                    }
+                    else
+                    {
+                        // Direct installation for .exe/.msi files
+                        ShowBusy($"Đang cài đặt {appName}...");
+
+                        var process = new Process
+                        {
+                            StartInfo = new ProcessStartInfo
+                            {
+                                FileName = tempPath,
+                                UseShellExecute = true,
+                                Verb = "runas",
+                                WindowStyle = ProcessWindowStyle.Normal
+                            }
+                        };
+                        process.Start();
+                        await Task.Run(() => process.WaitForExit());
+
+                        HideBusy();
+                        ShowSnackbar("Thành công", $"Đã cài đặt {appName} thành công!", ControlAppearance.Success);
+                        await ShowInfoDialogAsync("Hoàn thành", $"{appName} đã được cài đặt thành công!");
+                    }
+
+                    // Cleanup
+                    try { File.Delete(tempPath); } catch { }
+                    try { Directory.Delete(extractPath, true); } catch { }
                 }
             }
             catch (Exception ex)
             {
                 HideBusy();
-                ShowSnackbar("Lỗi", $"Không thể tải {appName}: {ex.Message}", ControlAppearance.Danger);
+                ShowSnackbar("Lỗi", $"Lỗi: {ex.Message}", ControlAppearance.Danger);
+                await ShowInfoDialogAsync("Lỗi", $"Không thể cài đặt {appName}:\n\n{ex.Message}");
             }
         }
 

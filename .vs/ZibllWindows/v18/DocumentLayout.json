@@ -1,0 +1,91 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Administrator\\Documents\\GitHub\\ZibllWindows\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|c:\\users\\administrator\\documents\\github\\zibllwindows\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|solutionrelative:mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|c:\\users\\administrator\\documents\\github\\zibllwindows\\actwin.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|solutionrelative:actwin.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|c:\\users\\administrator\\documents\\github\\zibllwindows\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|solutionrelative:mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|c:\\users\\administrator\\documents\\github\\zibllwindows\\actoffice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7EB81340-F9DB-926B-0C98-C602035ABD5B}|ZibllWindows.csproj|solutionrelative:actoffice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 3,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "ActWin.cs",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\ZibllWindows\\ActWin.cs",
+              "RelativeDocumentMoniker": "ActWin.cs",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\ZibllWindows\\ActWin.cs",
+              "RelativeToolTip": "ActWin.cs",
+              "ViewState": "AgIAAEgAAAAAAAAAAADgv4YAAACYAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-04T18:36:40.545Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "ActOffice.cs",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\ZibllWindows\\ActOffice.cs",
+              "RelativeDocumentMoniker": "ActOffice.cs",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\ZibllWindows\\ActOffice.cs",
+              "RelativeToolTip": "ActOffice.cs",
+              "ViewState": "AgIAAIkAAAAAAAAAAAAwwJwAAAA6AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-04T18:20:38.775Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "MainWindow.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\ZibllWindows\\MainWindow.xaml.cs",
+              "RelativeDocumentMoniker": "MainWindow.xaml.cs",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\ZibllWindows\\MainWindow.xaml.cs",
+              "RelativeToolTip": "MainWindow.xaml.cs",
+              "ViewState": "AgIAAGsFAAAAAAAAAADwv3UFAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-04T18:16:42.495Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "MainWindow.xaml",
+              "DocumentMoniker": "C:\\Users\\Administrator\\Documents\\GitHub\\ZibllWindows\\MainWindow.xaml",
+              "RelativeDocumentMoniker": "MainWindow.xaml",
+              "ToolTip": "C:\\Users\\Administrator\\Documents\\GitHub\\ZibllWindows\\MainWindow.xaml",
+              "RelativeToolTip": "MainWindow.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-12-04T18:16:42.649Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

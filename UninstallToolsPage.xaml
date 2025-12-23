@@ -1,0 +1,77 @@
+<ui:FluentWindow x:Class="ZibllWindows.UninstallToolsPage"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="Xóa - Gỡ phần mềm rác"
+                 Width="500"
+                 Height="400"
+                 WindowStartupLocation="CenterOwner"
+                 ResizeMode="NoResize">
+    <Grid Margin="30">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock Text="Xóa - Gỡ phần mềm rác" 
+                       FontSize="20" 
+                       FontWeight="Bold"
+                       Margin="0,0,0,5"/>
+            <TextBlock Text="Tải và chạy công cụ gỡ cài đặt chuyên dụng"
+                       FontSize="12"
+                       Foreground="Gray"/>
+        </StackPanel>
+        
+        <StackPanel Grid.Row="1">
+            <StackPanel.Resources>
+                <Style TargetType="ui:Button">
+                    <Setter Property="Margin" Value="0,0,0,15"/>
+                </Style>
+            </StackPanel.Resources>
+            <ui:Button x:Name="BtnBloatware"
+                       Content="🗑️ Xóa Bloatware"
+                       Click="BtnBloatware_Click"
+                       HorizontalAlignment="Stretch"
+                       Padding="15,12"
+                       FontSize="14"/>
+            
+            <ui:Button x:Name="BtnBKAV"
+                       Content="🗑️ Gỡ sạch BKAV"
+                       Click="BtnBKAV_Click"
+                       HorizontalAlignment="Stretch"
+                       Padding="15,12"
+                       FontSize="14"/>
+            
+            <ui:Button x:Name="Btn360"
+                       Content="🗑️ Gỡ sạch 360 Virus"
+                       Click="Btn360_Click"
+                       HorizontalAlignment="Stretch"
+                       Padding="15,12"
+                       FontSize="14"/>
+            
+            <ui:Button x:Name="BtnWPS"
+                       Content="🗑️ Gỡ sạch WPS Office"
+                       Click="BtnWPS_Click"
+                       HorizontalAlignment="Stretch"
+                       Padding="15,12"
+                       FontSize="14"/>
+            
+            <ui:Button x:Name="BtnEdge"
+                       Content="🗑️ Gỡ Microsoft Edge"
+                       Click="BtnEdge_Click"
+                       HorizontalAlignment="Stretch"
+                       Padding="15,12"
+                       FontSize="14"/>
+        </StackPanel>
+        
+        <TextBlock x:Name="LblStatus"
+                   Grid.Row="2"
+                   Text="Sẵn sàng..."
+                   FontSize="12"
+                   Foreground="Green"
+                   Margin="0,20,0,0"
+                   TextWrapping="Wrap"/>
+    </Grid>
+</ui:FluentWindow>

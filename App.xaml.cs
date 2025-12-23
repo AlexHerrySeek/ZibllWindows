@@ -5,7 +5,7 @@ using System.Windows;
 
 namespace ZibllWindows
 {
-    public partial class App : Application
+    public partial class App : System.Windows.Application
     {
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -15,6 +15,48 @@ namespace ZibllWindows
             TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
 
             base.OnStartup(e);
+
+            // Check if installed, if not show InstallPage first
+            CheckInstallationAndStart();
+        }
+
+        private void CheckInstallationAndStart()
+        {
+            try
+            {
+                string installPath = @"C:\Program Files\ZibllWindows";
+                bool isInstalled = Directory.Exists(installPath) && 
+                                   File.Exists(Path.Combine(installPath, "ZibllWindows.exe"));
+
+                // Get current executable path
+                string currentExe = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                if (string.IsNullOrEmpty(currentExe))
+                {
+                    currentExe = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                }
+                
+                string currentDir = Path.GetDirectoryName(currentExe) ?? "";
+                bool isRunningFromInstall = !string.IsNullOrEmpty(currentDir) && 
+                                           currentDir.Equals(installPath, StringComparison.OrdinalIgnoreCase);
+
+                // If not installed or not running from install directory, show InstallPage
+                if (!isInstalled || !isRunningFromInstall)
+                {
+                    var installPage = new InstallPage();
+                    installPage.ShowDialog();
+                    
+                    // After install page closes, check if we should continue
+                    if (!isInstalled && !Directory.Exists(installPath))
+                    {
+                        // User skipped installation, continue anyway
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // If error checking, continue to MainWindow anyway
+                System.Diagnostics.Debug.WriteLine($"Error checking installation: {ex.Message}");
+            }
         }
 
         private void LogAndReport(string title, Exception ex)
@@ -27,7 +69,7 @@ namespace ZibllWindows
                 File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {title}: {ex}\n\n");
 
                 // Use a simple MessageBox here to ensure no dependency on UI libraries
-                MessageBox.Show($"{title}: {ex.Message}\n\nLog: {logPath}", "ActivationTool - Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show($"{title}: {ex.Message}\n\nLog: {logPath}", "ActivationTool - Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             catch
             {

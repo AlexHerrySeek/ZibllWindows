@@ -1,0 +1,51 @@
+<ui:FluentWindow x:Class="ZibllWindows.ProductKeyDialog"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="Nhập Product Key"
+                 Width="500"
+                 Height="250"
+                 WindowStartupLocation="CenterOwner"
+                 ResizeMode="NoResize">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <TextBlock Grid.Row="0" 
+                   Text="Nhập Product Key của bạn"
+                   FontSize="16"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,15"/>
+        
+        <TextBlock Grid.Row="1"
+                   Text="Ví dụ: XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+                   FontSize="12"
+                   Foreground="Gray"
+                   Margin="0,0,0,10"/>
+        
+        <TextBox x:Name="KeyTextBox"
+                 Grid.Row="2"
+                 FontSize="14"
+                 Padding="10"
+                 MaxLength="29"
+                 TextChanged="KeyTextBox_TextChanged"
+                 Margin="0,0,0,20"/>
+        
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <ui:Button x:Name="OkButton"
+                       Content="Kích hoạt"
+                       Appearance="Primary"
+                       Click="OkButton_Click"
+                       Margin="0,0,10,0"
+                       IsEnabled="False"/>
+            <ui:Button Content="Hủy"
+                       Click="CancelButton_Click"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

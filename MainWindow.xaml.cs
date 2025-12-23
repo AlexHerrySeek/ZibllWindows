@@ -1,10 +1,12 @@
 ﻿using Microsoft.Win32;
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Principal;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -22,7 +24,8 @@ namespace ZibllWindows
         public MainWindow()
         {
             InitializeComponent();
-            
+            Closing += MainWindow_Closing;
+
             // Load settings
             settings = AppSettings.Load();
             ApplySettings();
@@ -32,8 +35,13 @@ namespace ZibllWindows
             // Navigate to home page by default
             NavigateToPage("home");
             
-            // Show intro and check for updates
-            Loaded += async (s, e) => await ShowIntroAndCheckUpdate();
+            // Show intro
+            Loaded += async (s, e) => 
+            {
+                await ShowIntro();
+                // Check for updates after intro
+                await CheckAndUpdateIfNeeded();
+            };
             
             // Save window size on resize/close
             SizeChanged += MainWindow_SizeChanged;
@@ -60,10 +68,19 @@ namespace ZibllWindows
 
         private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
-            settings?.Save();
+            try
+            {
+                settings?.Save();
+            }
+            catch
+            {
+                // bỏ qua lỗi save
+            }
+            e.Cancel = true;
+            System.Diagnostics.Process.GetCurrentProcess().Kill();
         }
 
-        private async Task ShowIntroAndCheckUpdate()
+        private async Task ShowIntro()
         {
             try
             {
@@ -74,58 +91,101 @@ namespace ZibllWindows
                 IntroStatusText.Text = "Đang khởi động...";
                 await Task.Delay(1000);
                 
-                // Check for updates
-                IntroStatusText.Text = "Kiểm tra cập nhật...";
-                await Task.Delay(500);
-                
-                using (var httpClient = new HttpClient())
-                {
-                    httpClient.Timeout = TimeSpan.FromSeconds(10);
-                    
-                    string versionUrl = "https://raw.githubusercontent.com/AlexHerrySeek/ZibllWindows/refs/heads/main/backend/version";
-                    string latestVersion = await httpClient.GetStringAsync(versionUrl);
-                    latestVersion = latestVersion.Trim();
-
-                    if (latestVersion != version)
-                    {
-                        IntroStatusText.Text = $"Phát hiện phiên bản mới: {latestVersion}";
-                        await Task.Delay(1000);
-                        
-                        // Fade out intro with animation
-                        await FadeOutIntro();
-                        
-                        var result = System.Windows.MessageBox.Show(
-                            $"Phiên bản hiện tại: {version}\nPhiên bản mới: {latestVersion}\n\nBạn có muốn tải về và cập nhật?",
-                            "Cập nhật có sẵn",
-                            System.Windows.MessageBoxButton.YesNo,
-                            System.Windows.MessageBoxImage.Information);
-
-                        if (result == System.Windows.MessageBoxResult.Yes)
-                        {
-                            await DownloadAndUpdate();
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        IntroStatusText.Text = "Bạn đang sử dụng phiên bản mới nhất";
-                        await Task.Delay(1000);
-                    }
-                }
-                
                 // Fade out intro and show welcome message
                 await FadeOutIntro();
                 ShowSnackbar("Sẵn sàng", "Ứng dụng đã sẵn sàng để kích hoạt Windows và Office", ControlAppearance.Success, 4000);
             }
             catch (Exception ex)
             {
-                IntroStatusText.Text = "Lỗi khi kiểm tra cập nhật";
+                IntroStatusText.Text = "Lỗi khi khởi động";
                 await Task.Delay(1500);
                 await FadeOutIntro();
+            }
+        }
+
+        private async Task CheckAndUpdateIfNeeded()
+        {
+            try
+            {
+                string installPath = @"C:\Program Files\ZibllWindows";
+                bool isInstalled = Directory.Exists(installPath) && 
+                                   File.Exists(Path.Combine(installPath, "ZibllWindows.exe"));
+
+                if (!isInstalled)
+                    return; // Skip update check if not installed
+
+                SetStatus("Đang kiểm tra cập nhật...", InfoBarSeverity.Informational);
                 
-                ShowSnackbar("Lỗi", $"Không thể kiểm tra cập nhật: {ex.Message}\n\nỨng dụng sẽ đóng sau 3 giây...", ControlAppearance.Danger, 3000);
-                await Task.Delay(3000);
+                using (var httpClient = new HttpClient())
+                {
+                    httpClient.Timeout = TimeSpan.FromSeconds(10);
+                    string versionUrl = "https://raw.githubusercontent.com/AlexHerrySeek/ZibllWindows/refs/heads/main/backend/version";
+                    string latestVersion = await httpClient.GetStringAsync(versionUrl);
+                    latestVersion = latestVersion.Trim();
+
+                    if (latestVersion != version)
+                    {
+                        SetStatus($"Phát hiện phiên bản mới: {latestVersion}", InfoBarSeverity.Success);
+                        
+                        var result = await ShowConfirmDialogAsync("Cập nhật có sẵn",
+                            $"Phiên bản hiện tại: {version}\nPhiên bản mới: {latestVersion}\n\nBạn có muốn tải về và cập nhật?");
+
+                        if (result)
+                        {
+                            await DownloadAndUpdate(latestVersion);
+                        }
+                    }
+                    else
+                    {
+                        SetStatus("Bạn đang sử dụng phiên bản mới nhất", InfoBarSeverity.Success);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Không thể kiểm tra cập nhật: {ex.Message}", InfoBarSeverity.Warning);
+            }
+        }
+
+        private async Task DownloadAndUpdate(string latestVersion)
+        {
+            try
+            {
+                SetStatus("Đang tải bản cập nhật...", InfoBarSeverity.Informational);
+                
+                string downloadUrl = $"https://github.com/AlexHerrySeek/ZibllWindows/releases/download/v{latestVersion}/ZibllWindows.exe";
+                string tempPath = Path.Combine(Path.GetTempPath(), "ZibllWindows_Update.exe");
+
+                using (var httpClient = new HttpClient())
+                {
+                    httpClient.Timeout = TimeSpan.FromMinutes(5);
+                    var response = await httpClient.GetAsync(downloadUrl);
+                    response.EnsureSuccessStatusCode();
+
+                    using (var fileStream = new FileStream(tempPath, FileMode.Create))
+                    {
+                        await response.Content.CopyToAsync(fileStream);
+                    }
+                }
+
+                // Run updater
+                var updaterProcess = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = tempPath,
+                        UseShellExecute = true
+                    }
+                };
+                updaterProcess.Start();
+
+                // Close current app
                 System.Windows.Application.Current.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi khi tải cập nhật: {ex.Message}", InfoBarSeverity.Error);
+                await ShowInfoDialogAsync("Lỗi", $"Không thể tải cập nhật:\n\n{ex.Message}");
             }
         }
 
@@ -250,12 +310,28 @@ namespace ZibllWindows
 
         private void NavigateToWindows_Click(object sender, RoutedEventArgs e)
         {
-            NavigateToPage("windows");
+            NavigateToPage("activate");
         }
 
         private void NavigateToOffice_Click(object sender, RoutedEventArgs e)
         {
-            NavigateToPage("office");
+            NavigateToPage("activate");
+        }
+
+        private void BtnOpenBackup_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var backupPage = new BackupPage
+                {
+                    Owner = this
+                };
+                backupPage.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                ShowSnackbar("Lỗi", $"Không thể mở công cụ sao lưu: {ex.Message}", ControlAppearance.Caution);
+            }
         }
 
         private void NavigateToPage(string pageTag)
@@ -266,8 +342,11 @@ namespace ZibllWindows
             {
                 // Hide all pages
                 HomePage.Visibility = Visibility.Collapsed;
-                WindowsPage.Visibility = Visibility.Collapsed;
-                OfficePage.Visibility = Visibility.Collapsed;
+                if (WindowsPage != null) WindowsPage.Visibility = Visibility.Collapsed;
+                if (OfficePage != null) OfficePage.Visibility = Visibility.Collapsed;
+                if (ActivatePage != null) ActivatePage.Visibility = Visibility.Collapsed;
+                if (BackupPage != null) BackupPage.Visibility = Visibility.Collapsed;
+                if (DevelopmentPage != null) DevelopmentPage.Visibility = Visibility.Collapsed;
                 ToolsPage.Visibility = Visibility.Collapsed;
                 GhostToolboxPage.Visibility = Visibility.Collapsed;
                 SystemInfoPage.Visibility = Visibility.Collapsed;
@@ -281,13 +360,27 @@ namespace ZibllWindows
                         HomePage.Visibility = Visibility.Visible;
                         System.Diagnostics.Debug.WriteLine("Showing HomePage");
                         break;
+                    case "activate":
+                        if (ActivatePage != null) ActivatePage.Visibility = Visibility.Visible;
+                        System.Diagnostics.Debug.WriteLine("Showing ActivatePage");
+                        break;
                     case "windows":
-                        WindowsPage.Visibility = Visibility.Visible;
-                        System.Diagnostics.Debug.WriteLine("Showing WindowsPage");
+                        if (WindowsPage != null) WindowsPage.Visibility = Visibility.Visible;
+                        else if (ActivatePage != null) ActivatePage.Visibility = Visibility.Visible;
+                        System.Diagnostics.Debug.WriteLine("Showing WindowsPage/ActivatePage");
                         break;
                     case "office":
-                        OfficePage.Visibility = Visibility.Visible;
-                        System.Diagnostics.Debug.WriteLine("Showing OfficePage");
+                        if (OfficePage != null) OfficePage.Visibility = Visibility.Visible;
+                        else if (ActivatePage != null) ActivatePage.Visibility = Visibility.Visible;
+                        System.Diagnostics.Debug.WriteLine("Showing OfficePage/ActivatePage");
+                        break;
+                    case "backup":
+                        if (BackupPage != null) BackupPage.Visibility = Visibility.Visible;
+                        System.Diagnostics.Debug.WriteLine("Showing BackupPage");
+                        break;
+                    case "development":
+                        if (DevelopmentPage != null) DevelopmentPage.Visibility = Visibility.Visible;
+                        System.Diagnostics.Debug.WriteLine("Showing DevelopmentPage");
                         break;
                     case "tools":
                         ToolsPage.Visibility = Visibility.Visible;
@@ -1035,28 +1128,228 @@ del ""%~f0"" & exit";
         // Windows Activation Methods
         private async void BtnActivateWindowsHWID_Click(object sender, RoutedEventArgs e)
         {
-            await ShowConfirmAndActivate("Windows bằng phương pháp HWID (Vĩnh viễn)", "hwid");
+            await ActivateWindowsWithProductKey();
+        }
+
+        private async void BtnActivateWindowsHWID2_Click(object sender, RoutedEventArgs e)
+        {
+            await ActivateWindowsWithProductKey();
         }
 
         private async void BtnActivateWindowsKMS38_Click(object sender, RoutedEventArgs e)
         {
-            await ShowConfirmAndActivate("Windows bằng phương pháp KMS38 (Đến 2038)", "kms38");
+            await ActivateWindowsWithProductKey();
         }
 
         private async void BtnActivateWindowsOnlineKMS_Click(object sender, RoutedEventArgs e)
         {
-            await ShowConfirmAndActivate("Windows bằng Online KMS (180 ngày)", "kms");
+            await ActivateWindowsWithProductKey();
         }
 
         // Office Activation Methods
         private async void BtnActivateOfficeOhook_Click(object sender, RoutedEventArgs e)
         {
-            await ShowConfirmAndActivate("Office bằng phương pháp Ohook (Vĩnh viễn)", "ohook");
+            await ActivateOfficeWithProductKey();
+        }
+
+        private async void BtnActivateOfficeOhook2_Click(object sender, RoutedEventArgs e)
+        {
+            await ActivateOfficeWithProductKey();
         }
 
         private async void BtnActivateOfficeKMS_Click(object sender, RoutedEventArgs e)
         {
-            await ShowConfirmAndActivate("Office bằng Online KMS (180 ngày)", "kms_office");
+            await ActivateOfficeWithProductKey();
+        }
+
+        // New activation methods using product key
+        private async Task ActivateWindowsWithProductKey()
+        {
+            try
+            {
+                var dialog = new ProductKeyDialog
+                {
+                    Owner = this
+                };
+
+                if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.ProductKey))
+                {
+                    await ActivateWindowsWithKey(dialog.ProductKey);
+                }
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi: {ex.Message}", InfoBarSeverity.Error);
+                await ShowInfoDialogAsync("Lỗi", $"Lỗi khi mở dialog: {ex.Message}");
+            }
+        }
+
+        private async Task ActivateOfficeWithProductKey()
+        {
+            try
+            {
+                var dialog = new ProductKeyDialog
+                {
+                    Owner = this
+                };
+
+                if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(dialog.ProductKey))
+                {
+                    await ActivateOfficeWithKey(dialog.ProductKey);
+                }
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi: {ex.Message}", InfoBarSeverity.Error);
+                await ShowInfoDialogAsync("Lỗi", $"Lỗi khi mở dialog: {ex.Message}");
+            }
+        }
+
+        private async Task ActivateWindowsWithKey(string productKey)
+        {
+            try
+            {
+                ShowBusy("Đang kích hoạt Windows...");
+                SetStatus("Đang kích hoạt Windows với Product Key...", InfoBarSeverity.Informational);
+                DisableButtons();
+
+                // Format key with hyphens
+                string formattedKey = FormatProductKey(productKey);
+
+                // Step 1: Uninstall existing key (if any)
+                await ExecuteSlmgrCommand("/upk");
+
+                // Step 2: Install the new product key
+                bool installSuccess = await ExecuteSlmgrCommand($"/ipk {formattedKey}");
+
+                if (!installSuccess)
+                {
+                    SetStatus("Lỗi: Không thể cài đặt Product Key!", InfoBarSeverity.Error);
+                    await ShowInfoDialogAsync("Lỗi", 
+                        "Không thể cài đặt Product Key.\n\n" +
+                        "Nguyên nhân có thể:\n" +
+                        "1. Product Key không hợp lệ\n" +
+                        "2. Product Key không phù hợp với phiên bản Windows hiện tại\n" +
+                        "3. Cần quyền Administrator");
+                    return;
+                }
+
+                // Step 3: Activate Windows
+                SetStatus("Đang kích hoạt Windows...", InfoBarSeverity.Warning);
+                bool activateSuccess = await ExecuteSlmgrCommand("/ato");
+
+                if (activateSuccess)
+                {
+                    await Task.Delay(2000);
+                    await CheckActivationStatus();
+                    SetStatus("Windows đã được kích hoạt thành công!", InfoBarSeverity.Success);
+                    await ShowInfoDialogAsync("Thành công", 
+                        "Windows đã được kích hoạt thành công với Product Key của bạn!");
+                }
+                else
+                {
+                    SetStatus("Kích hoạt thất bại!", InfoBarSeverity.Error);
+                    await ShowInfoDialogAsync("Lỗi", 
+                        "Không thể kích hoạt Windows.\n\n" +
+                        "Nguyên nhân có thể:\n" +
+                        "1. Product Key đã được sử dụng trên máy khác\n" +
+                        "2. Không có kết nối Internet để xác thực\n" +
+                        "3. Product Key không hợp lệ hoặc đã hết hạn");
+                }
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi: {ex.Message}", InfoBarSeverity.Error);
+                await ShowInfoDialogAsync("Lỗi", $"Lỗi khi kích hoạt Windows: {ex.Message}");
+            }
+            finally
+            {
+                HideBusy();
+                EnableButtons();
+            }
+        }
+
+        private async Task ActivateOfficeWithKey(string productKey)
+        {
+            try
+            {
+                ShowBusy("Đang kích hoạt Office...");
+                SetStatus("Đang kích hoạt Office với Product Key...", InfoBarSeverity.Informational);
+                DisableButtons();
+
+                string officePath = FindOfficePath();
+                if (string.IsNullOrEmpty(officePath))
+                {
+                    SetStatus("Không tìm thấy Office!", InfoBarSeverity.Error);
+                    await ShowInfoDialogAsync("Lỗi", "Không tìm thấy cài đặt Microsoft Office trên hệ thống.");
+                    return;
+                }
+
+                // Format key with hyphens
+                string formattedKey = FormatProductKey(productKey);
+
+                // Step 1: Install the product key
+                SetStatus("Đang cài đặt Product Key...", InfoBarSeverity.Informational);
+                bool installSuccess = await ExecuteOfficeCommand($"/inpkey:{formattedKey}");
+
+                if (!installSuccess)
+                {
+                    SetStatus("Lỗi: Không thể cài đặt Product Key!", InfoBarSeverity.Error);
+                    await ShowInfoDialogAsync("Lỗi", 
+                        "Không thể cài đặt Product Key.\n\n" +
+                        "Nguyên nhân có thể:\n" +
+                        "1. Product Key không hợp lệ\n" +
+                        "2. Product Key không phù hợp với phiên bản Office hiện tại");
+                    return;
+                }
+
+                // Step 2: Activate Office
+                SetStatus("Đang kích hoạt Office...", InfoBarSeverity.Warning);
+                bool activateSuccess = await ExecuteOfficeCommand("/act");
+
+                if (activateSuccess)
+                {
+                    await Task.Delay(2000);
+                    await ExecuteOfficeCommand("/dstatus");
+                    SetStatus("Office đã được kích hoạt thành công!", InfoBarSeverity.Success);
+                    await ShowInfoDialogAsync("Thành công", 
+                        "Office đã được kích hoạt thành công với Product Key của bạn!");
+                }
+                else
+                {
+                    SetStatus("Kích hoạt thất bại!", InfoBarSeverity.Error);
+                    await ShowInfoDialogAsync("Lỗi", 
+                        "Không thể kích hoạt Office.\n\n" +
+                        "Nguyên nhân có thể:\n" +
+                        "1. Product Key đã được sử dụng trên máy khác\n" +
+                        "2. Không có kết nối Internet để xác thực\n" +
+                        "3. Product Key không hợp lệ hoặc đã hết hạn");
+                }
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi: {ex.Message}", InfoBarSeverity.Error);
+                await ShowInfoDialogAsync("Lỗi", $"Lỗi khi kích hoạt Office: {ex.Message}");
+            }
+            finally
+            {
+                HideBusy();
+                EnableButtons();
+            }
+        }
+
+        private string FormatProductKey(string key)
+        {
+            // Remove all non-alphanumeric characters
+            string cleanKey = System.Text.RegularExpressions.Regex.Replace(key.ToUpper(), "[^A-Z0-9]", "");
+            
+            // Format as XXXXX-XXXXX-XXXXX-XXXXX-XXXXX
+            if (cleanKey.Length == 25)
+            {
+                return $"{cleanKey.Substring(0, 5)}-{cleanKey.Substring(5, 5)}-{cleanKey.Substring(10, 5)}-{cleanKey.Substring(15, 5)}-{cleanKey.Substring(20, 5)}";
+            }
+            
+            return key; // Return as-is if not 25 characters
         }
 
         private async Task ShowConfirmAndActivate(string message, string method)
@@ -2711,40 +3004,36 @@ del /f /q ""%~f0""
 
         private void DisableButtons()
         {
-            BtnActivateWindowsHWID.IsEnabled = false;
-            BtnActivateWindowsKMS38.IsEnabled = false;
-            BtnActivateWindowsOnlineKMS.IsEnabled = false;
-            BtnActivateOfficeOhook.IsEnabled = false;
-            BtnActivateOfficeKMS.IsEnabled = false;
-            BtnCheckActivation.IsEnabled = false;
-            BtnRemoveActivation.IsEnabled = false;
-            BtnInstallKey.IsEnabled = false;
-            BtnChangeEdition.IsEnabled = false;
-            BtnConvertOffice.IsEnabled = false;
-            BtnOfficeToolPlus.IsEnabled = false;
-            BtnExtractOEM.IsEnabled = false;
-            BtnTroubleshoot.IsEnabled = false;
-            BtnResetLicensing.IsEnabled = false;
-            BtnAdvancedKMS.IsEnabled = false;
+            if (BtnActivateWindowsHWID != null) BtnActivateWindowsHWID.IsEnabled = false;
+            // Buttons đã được đổi tên hoặc xóa
+            if (BtnActivateOfficeOhook != null) BtnActivateOfficeOhook.IsEnabled = false;
+            if (BtnCheckActivation != null) BtnCheckActivation.IsEnabled = false;
+            if (BtnRemoveActivation != null) BtnRemoveActivation.IsEnabled = false;
+            if (BtnInstallKey != null) BtnInstallKey.IsEnabled = false;
+            if (BtnChangeEdition != null) BtnChangeEdition.IsEnabled = false;
+            if (BtnConvertOffice != null) BtnConvertOffice.IsEnabled = false;
+            if (BtnOfficeToolPlus != null) BtnOfficeToolPlus.IsEnabled = false;
+            if (BtnExtractOEM != null) BtnExtractOEM.IsEnabled = false;
+            if (BtnTroubleshoot != null) BtnTroubleshoot.IsEnabled = false;
+            if (BtnResetLicensing != null) BtnResetLicensing.IsEnabled = false;
+            if (BtnAdvancedKMS != null) BtnAdvancedKMS.IsEnabled = false;
         }
 
         private void EnableButtons()
         {
-            BtnActivateWindowsHWID.IsEnabled = true;
-            BtnActivateWindowsKMS38.IsEnabled = true;
-            BtnActivateWindowsOnlineKMS.IsEnabled = true;
-            BtnActivateOfficeOhook.IsEnabled = true;
-            BtnActivateOfficeKMS.IsEnabled = true;
-            BtnCheckActivation.IsEnabled = true;
-            BtnRemoveActivation.IsEnabled = true;
-            BtnInstallKey.IsEnabled = true;
-            BtnChangeEdition.IsEnabled = true;
-            BtnConvertOffice.IsEnabled = true;
-            BtnOfficeToolPlus.IsEnabled = true;
-            BtnExtractOEM.IsEnabled = true;
-            BtnTroubleshoot.IsEnabled = true;
-            BtnResetLicensing.IsEnabled = true;
-            BtnAdvancedKMS.IsEnabled = true;
+            if (BtnActivateWindowsHWID != null) BtnActivateWindowsHWID.IsEnabled = true;
+            // Buttons đã được đổi tên hoặc xóa
+            if (BtnActivateOfficeOhook != null) BtnActivateOfficeOhook.IsEnabled = true;
+            if (BtnCheckActivation != null) BtnCheckActivation.IsEnabled = true;
+            if (BtnRemoveActivation != null) BtnRemoveActivation.IsEnabled = true;
+            if (BtnInstallKey != null) BtnInstallKey.IsEnabled = true;
+            if (BtnChangeEdition != null) BtnChangeEdition.IsEnabled = true;
+            if (BtnConvertOffice != null) BtnConvertOffice.IsEnabled = true;
+            if (BtnOfficeToolPlus != null) BtnOfficeToolPlus.IsEnabled = true;
+            if (BtnExtractOEM != null) BtnExtractOEM.IsEnabled = true;
+            if (BtnTroubleshoot != null) BtnTroubleshoot.IsEnabled = true;
+            if (BtnResetLicensing != null) BtnResetLicensing.IsEnabled = true;
+            if (BtnAdvancedKMS != null) BtnAdvancedKMS.IsEnabled = true;
         }
 
         // ===== Ghost Toolbox Features =====
@@ -3033,64 +3322,90 @@ reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"" /v
         }
 
         // Helper method for Ghost Toolbox commands
-        private async Task ExecuteGhostCommand(string command, string featureName)
+        private async Task ExecuteGhostCommand(string psScript, string featureName)
         {
             try
             {
-                var confirmed = await ShowConfirmDialogAsync(featureName, $"Bạn có chắc chắn muốn thực hiện: {featureName}?\n\nLưu ý: Một số thay đổi có thể yêu cầu khởi động lại.");
-                if (!confirmed)
-                {
-                    ShowSnackbar("Đã hủy", $"Đã hủy thao tác: {featureName}", ControlAppearance.Secondary);
-                    return;
-                }
-                
-                ShowBusy($"Đang thực hiện: {featureName}...");
-                SetStatus($"Đang thực hiện: {featureName}...", InfoBarSeverity.Informational);
+                var confirmed = await ShowConfirmDialogAsync(
+                    "Xác nhận",
+                    $"Bạn có chắc muốn thực hiện: {featureName}?\n\nYêu cầu quyền Administrator."
+                );
+                if (!confirmed) return;
 
-                var tempFile = Path.Combine(Path.GetTempPath(), $"ghost_{Guid.NewGuid()}.cmd");
-                await File.WriteAllTextAsync(tempFile, $"@echo off\n{command}\necho.\necho Hoan tat: {featureName}\npause");
+                ShowBusy($"Đang áp dụng {featureName}...");
+                SetStatus($"Đang áp dụng {featureName}...", InfoBarSeverity.Informational);
+
+                if (string.IsNullOrWhiteSpace(psScript))
+                {
+                    throw new ArgumentException("PowerShell script không được rỗng");
+                }
+
+                // Clean script
+                psScript = psScript.Trim();
+                if (psScript.StartsWith("powershell", StringComparison.OrdinalIgnoreCase))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(
+                        psScript,
+                        @"^powershell(?:\.exe)?\s+(?:-Command|-c)\s+""(.+)""$",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+                        System.Text.RegularExpressions.RegexOptions.Singleline
+                    );
+
+                    if (match.Success)
+                    {
+                        psScript = match.Groups[1].Value.Replace("\\\"", "\"");
+                    }
+                }
+
+                // Encode script to Base64 để tránh mọi vấn đề về escape
+                var bytes = Encoding.Unicode.GetBytes(psScript);
+                var encodedScript = Convert.ToBase64String(bytes);
 
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
                     {
-                        FileName = "cmd.exe",
-                        Arguments = $"/c \"{tempFile}\"",
-                        Verb = "runas",
+                        FileName = "powershell.exe",
+                        Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedScript}",
                         UseShellExecute = true,
-                        WindowStyle = ProcessWindowStyle.Hidden
+                        Verb = "runas",
+                        CreateNoWindow = false,
+                        RedirectStandardOutput = false,
+                        RedirectStandardError = false
                     }
                 };
 
-                process.Start();
-                await process.WaitForExitAsync();
+                try
+                {
+                    process.Start();
+                }
+                catch (System.ComponentModel.Win32Exception win32Ex)
+                {
+                    if (win32Ex.NativeErrorCode == 1223)
+                    {
+                        SetStatus("Đã hủy bởi người dùng", InfoBarSeverity.Warning);
+                        return;
+                    }
+                    throw;
+                }
 
-                try { File.Delete(tempFile); } catch { }
+                await process.WaitForExitAsync();
 
                 if (process.ExitCode == 0)
                 {
-                    SetStatus($"Hoàn thành: {featureName}", InfoBarSeverity.Success);
-                    ShowSnackbar("Thành công", $"{featureName} đã hoàn tất!", ControlAppearance.Success);
-                    await ShowInfoDialogAsync("Thành công", $"{featureName} đã hoàn tất thành công!");
+                    SetStatus($"Thành công: {featureName}", InfoBarSeverity.Success);
+                    ShowSnackbar("Thành công", featureName, ControlAppearance.Success);
                 }
                 else
                 {
-                    SetStatus($"Lỗi: {featureName}", InfoBarSeverity.Warning);
-                    ShowSnackbar("Cảnh báo", $"{featureName} hoàn tất với mã lỗi: {process.ExitCode}", ControlAppearance.Caution);
-                    await ShowInfoDialogAsync("Cảnh báo", $"{featureName} đã hoàn tất nhưng có mã lỗi: {process.ExitCode}\n\nVui lòng kiểm tra kết quả.");
+                    SetStatus($"Thất bại: {featureName} (Exit code: {process.ExitCode})", InfoBarSeverity.Error);
+                    ShowSnackbar("Thất bại", $"{featureName} - Exit code: {process.ExitCode}", ControlAppearance.Danger);
                 }
-            }
-            catch (System.ComponentModel.Win32Exception)
-            {
-                // User cancelled UAC prompt
-                SetStatus("Đã hủy quyền Admin", InfoBarSeverity.Warning);
-                ShowSnackbar("Đã hủy", "Bạn đã từ chối quyền Admin", ControlAppearance.Secondary);
             }
             catch (Exception ex)
             {
-                SetStatus($"Lỗi: {ex.Message}", InfoBarSeverity.Error);
-                ShowSnackbar("Lỗi", $"Lỗi: {ex.Message}", ControlAppearance.Danger);
-                await ShowInfoDialogAsync("Lỗi", $"Lỗi khi thực hiện {featureName}:\n\n{ex.Message}");
+                SetStatus("Lỗi Installer", InfoBarSeverity.Error);
+                await ShowInfoDialogAsync("Lỗi", ex.Message);
             }
             finally
             {
@@ -3099,7 +3414,7 @@ reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"" /v
         }
 
         // ===== Ghost Toolbox Installer Features =====
-        
+
         private async void BtnInstallEdge_Click(object sender, RoutedEventArgs e)
         {
             await DownloadAndInstall("Microsoft Edge", "https://go.microsoft.com/fwlink/?linkid=2108834&Channel=Stable&language=en");

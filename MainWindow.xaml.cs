@@ -19,7 +19,7 @@ namespace ZibllWindows
     {
         private AppSettings settings;
         private System.Windows.Media.ImageBrush backgroundBrush = new System.Windows.Media.ImageBrush();
-        private string version = "1.2";
+        private string version = "1.3";
 
         public MainWindow()
         {
@@ -93,7 +93,6 @@ namespace ZibllWindows
                 
                 // Fade out intro and show welcome message
                 await FadeOutIntro();
-                ShowSnackbar("Sẵn sàng", "Ứng dụng đã sẵn sàng để kích hoạt Windows và Office", ControlAppearance.Success, 4000);
             }
             catch (Exception ex)
             {
@@ -108,13 +107,10 @@ namespace ZibllWindows
             try
             {
                 string installPath = @"C:\Program Files\ZibllWindows";
-                bool isInstalled = Directory.Exists(installPath) && 
-                                   File.Exists(Path.Combine(installPath, "ZibllWindows.exe"));
+                bool isInstalled = Directory.Exists(installPath) && File.Exists(Path.Combine(installPath, "ZibllWindows.exe"));
 
                 if (!isInstalled)
                     return; // Skip update check if not installed
-
-                SetStatus("Đang kiểm tra cập nhật...", InfoBarSeverity.Informational);
                 
                 using (var httpClient = new HttpClient())
                 {
@@ -127,8 +123,7 @@ namespace ZibllWindows
                     {
                         SetStatus($"Phát hiện phiên bản mới: {latestVersion}", InfoBarSeverity.Success);
                         
-                        var result = await ShowConfirmDialogAsync("Cập nhật có sẵn",
-                            $"Phiên bản hiện tại: {version}\nPhiên bản mới: {latestVersion}\n\nBạn có muốn tải về và cập nhật?");
+                        var result = await ShowConfirmDialogAsync("Cập nhật có sẵn", $"Phiên bản hiện tại: {version}\nPhiên bản mới: {latestVersion}\n\nBạn có muốn tải về và cập nhật?");
 
                         if (result)
                         {
@@ -137,7 +132,7 @@ namespace ZibllWindows
                     }
                     else
                     {
-                        SetStatus("Bạn đang sử dụng phiên bản mới nhất", InfoBarSeverity.Success);
+                        // SetStatus("Bạn đang sử dụng phiên bản mới nhất", InfoBarSeverity.Success);
                     }
                 }
             }
@@ -2290,45 +2285,6 @@ del ""%~f0"" & exit";
             }
         }
 
-        // THÊM PHƯƠNG THỨC RunProcessAsync
-        private async Task<string> RunProcessAsync(string fileName, string arguments)
-        {
-            try
-            {
-                var psi = new ProcessStartInfo
-                {
-                    FileName = fileName,
-                    Arguments = arguments,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
-
-                using (var process = new Process { StartInfo = psi })
-                {
-                    process.Start();
-                    string output = await process.StandardOutput.ReadToEndAsync();
-                    string error = await process.StandardError.ReadToEndAsync();
-                    await Task.Run(() => process.WaitForExit(30000));
-
-                    if (process.ExitCode == 0)
-                    {
-                        return output;
-                    }
-                    else
-                    {
-                        return $"Error: {error}";
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                return $"Exception: {ex.Message}";
-            }
-        }
-
-        // THÊM PHƯƠNG THỨC RunProcessCheckSuccess
         private async Task<bool> RunProcessCheckSuccess(string fileName, string arguments)
         {
             try
@@ -2828,27 +2784,6 @@ del /f /q ""%~f0""
             await CheckActivationStatus();
         }
 
-        // Keep old methods for backward compatibility
-        private async void BtnActivateWindows_Click(object sender, RoutedEventArgs e)
-        {
-            await ShowConfirmAndActivate("Windows bằng phương pháp HWID (Vĩnh viễn)", "hwid");
-        }
-
-        private async void BtnActivateOffice_Click(object sender, RoutedEventArgs e)
-        {
-            await ShowConfirmAndActivate("Office bằng phương pháp Ohook (Vĩnh viễn)", "ohook");
-        }
-
-        private async Task ActivateWindows()
-        {
-            await ActivateWithMethod("hwid");
-        }
-
-        private async Task ActivateOffice()
-        {
-            await ActivateWithMethod("ohook");
-        }
-
         private async Task CheckActivationStatus()
         {
             try
@@ -3037,383 +2972,852 @@ del /f /q ""%~f0""
         }
 
         // ===== Ghost Toolbox Features =====
-        
-        // Performance & Gaming
+        private async Task RunSystemCommand(string fileName, string arguments, string featureName, bool requireAdmin = true)
+        {
+            try
+            {
+                var confirmed = await ShowConfirmDialogAsync("Xác nhận",
+                    $"Bạn có chắc muốn thực hiện: {featureName}?" +
+                    (requireAdmin ? "\n\nYêu cầu quyền Administrator." : ""));
+
+                if (!confirmed)
+                {
+                    HideBusy(); // Ẩn busy nếu người dùng hủy
+                    return;
+                }
+
+                ShowBusy($"Đang thực thi {featureName}...");
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = true,
+                    Verb = requireAdmin ? "runas" : null,
+                    WindowStyle = ProcessWindowStyle.Normal,
+                    CreateNoWindow = false
+                };
+
+                using (var process = Process.Start(startInfo))
+                {
+                    // Chỉ chờ kết thúc nếu không phải ứng dụng GUI
+                    if (!IsGUIApplication(fileName))
+                    {
+                        await process.WaitForExitAsync();
+
+                        if (process.ExitCode == 0)
+                        {
+                            SetStatus($"Thành công: {featureName}", InfoBarSeverity.Success);
+                            ShowSnackbar("Thành công", featureName, ControlAppearance.Success);
+                        }
+                        else
+                        {
+                            SetStatus($"Lỗi (Mã {process.ExitCode}): {featureName}", InfoBarSeverity.Error);
+                            ShowSnackbar("Thất bại", $"Mã lỗi: {process.ExitCode}", ControlAppearance.Danger);
+                        }
+
+                        // QUAN TRỌNG: Ẩn busy sau khi lệnh hoàn thành
+                        HideBusy();
+                    }
+                    else
+                    {
+                        // Ứng dụng GUI, chỉ thông báo đã mở
+                        HideBusy();
+                        ShowSnackbar("Đã mở", featureName, ControlAppearance.Success);
+                    }
+                }
+            }
+            catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                SetStatus($"Đã hủy: {featureName}", InfoBarSeverity.Warning);
+                ShowSnackbar("Đã hủy", "Người dùng từ chối cấp quyền Administrator.", ControlAppearance.Caution);
+                HideBusy();
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi hệ thống: {featureName}", InfoBarSeverity.Error);
+                ShowSnackbar("Lỗi", ex.Message, ControlAppearance.Danger);
+                HideBusy();
+            }
+        }
+
+        private async Task RunBatchCommands(string batchCommands, string featureName, bool requireAdmin = true)
+        {
+            string tempBatchPath = Path.GetTempFileName() + ".bat";
+
+            try
+            {
+                var confirmed = await ShowConfirmDialogAsync("Xác nhận",
+                    $"Bạn có chắc muốn thực hiện: {featureName}?" +
+                    (requireAdmin ? "\n\nYêu cầu quyền Administrator." : ""));
+
+                if (!confirmed) return;
+
+                ShowBusy($"Đang áp dụng {featureName}...");
+
+                // Ghi các lệnh batch vào file
+                await File.WriteAllTextAsync(tempBatchPath, batchCommands, Encoding.UTF8);
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"{tempBatchPath}\"",
+                    UseShellExecute = true,
+                    Verb = requireAdmin ? "runas" : null,
+                    WindowStyle = ProcessWindowStyle.Normal,
+                    CreateNoWindow = false
+                };
+
+                using (var process = new Process { StartInfo = startInfo })
+                {
+                    process.Start();
+                    await process.WaitForExitAsync();
+
+                    if (process.ExitCode == 0)
+                    {
+                        SetStatus($"Thành công: {featureName}", InfoBarSeverity.Success);
+                        ShowSnackbar("Thành công", featureName, ControlAppearance.Success);
+                    }
+                    else
+                    {
+                        SetStatus($"Lỗi (Mã {process.ExitCode}): {featureName}", InfoBarSeverity.Error);
+                        ShowSnackbar("Lỗi thực thi", $"Mã lỗi: {process.ExitCode}", ControlAppearance.Danger);
+                    }
+                }
+            }
+            catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                SetStatus($"Đã hủy: {featureName}", InfoBarSeverity.Warning);
+                ShowSnackbar("Đã hủy", "Người dùng đã từ chối quyền Administrator.", ControlAppearance.Caution);
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi hệ thống: {featureName}", InfoBarSeverity.Error);
+                ShowSnackbar("Lỗi hệ thống", ex.Message, ControlAppearance.Danger);
+            }
+            finally
+            {
+                HideBusy();
+                // Cleanup file tạm
+                try { if (File.Exists(tempBatchPath)) File.Delete(tempBatchPath); } catch { }
+            }
+        }
+
+        private async Task RunPowerShellCommand(string psScript, string featureName, bool requireAdmin = true)
+        {
+            string tempScriptPath = Path.GetTempFileName() + ".ps1";
+
+            try
+            {
+                var confirmed = await ShowConfirmDialogAsync("Xác nhận",
+                    $"Bạn có chắc muốn thực hiện: {featureName}?" +
+                    (requireAdmin ? "\n\nYêu cầu quyền Administrator." : ""));
+
+                if (!confirmed) return;
+
+                ShowBusy($"Đang áp dụng {featureName}...");
+
+                // Ghi script vào file
+                await File.WriteAllTextAsync(tempScriptPath, psScript, Encoding.UTF8);
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{tempScriptPath}\"",
+                    UseShellExecute = true,
+                    Verb = requireAdmin ? "runas" : null,
+                    WindowStyle = ProcessWindowStyle.Normal,
+                    CreateNoWindow = false
+                };
+
+                using (var process = new Process { StartInfo = startInfo })
+                {
+                    process.Start();
+                    await process.WaitForExitAsync();
+
+                    if (process.ExitCode == 0)
+                    {
+                        SetStatus($"Thành công: {featureName}", InfoBarSeverity.Success);
+                        ShowSnackbar("Thành công", featureName, ControlAppearance.Success);
+                    }
+                    else
+                    {
+                        SetStatus($"Lỗi (Mã {process.ExitCode}): {featureName}", InfoBarSeverity.Error);
+                        ShowSnackbar("Lỗi thực thi", $"Mã lỗi: {process.ExitCode}", ControlAppearance.Danger);
+                    }
+                }
+            }
+            catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                SetStatus($"Đã hủy: {featureName}", InfoBarSeverity.Warning);
+                ShowSnackbar("Đã hủy", "Người dùng đã từ chối quyền Administrator.", ControlAppearance.Caution);
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Lỗi hệ thống: {featureName}", InfoBarSeverity.Error);
+                ShowSnackbar("Lỗi hệ thống", ex.Message, ControlAppearance.Danger);
+            }
+            finally
+            {
+                HideBusy();
+                // Cleanup file tạm
+                try { if (File.Exists(tempScriptPath)) File.Delete(tempScriptPath); } catch { }
+            }
+        }
+
+        private async Task OpenApplicationAsync(string fileName, string arguments, string featureName, bool requireAdmin = false)
+        {
+            try
+            {
+                var confirmed = await ShowConfirmDialogAsync("Xác nhận", $"Mở {featureName}?");
+                if (!confirmed) return;
+
+                ShowBusy($"Đang mở {featureName}...");
+
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = true,
+                    Verb = requireAdmin ? "runas" : null
+                };
+
+                Process.Start(startInfo);
+
+                HideBusy();
+                ShowSnackbar("Đã mở", featureName, ControlAppearance.Success);
+            }
+            catch (Win32Exception ex) when (ex.NativeErrorCode == 2)
+            {
+                HideBusy();
+                ShowSnackbar("Lỗi", $"Không tìm thấy ứng dụng: {featureName}", ControlAppearance.Danger);
+            }
+            catch (Exception ex)
+            {
+                HideBusy();
+                ShowSnackbar("Lỗi", $"Không thể mở {featureName}: {ex.Message}", ControlAppearance.Danger);
+            }
+        }
+
+        // ===== SYSTEM TWEAKS =====
+
         private async void BtnDisableHPET_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("bcdedit /deletevalue useplatformclock", "Disable HPET");
+            await RunSystemCommand("bcdedit.exe", "/deletevalue useplatformclock", "Disable HPET");
         }
 
         private async void BtnEnableHPET_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("bcdedit /set useplatformclock true", "Enable HPET");
+            await RunSystemCommand("bcdedit.exe", "/set useplatformclock true", "Enable HPET");
         }
 
         private async void BtnDisableStartupDelay_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Serialize\" /v \"StartupDelayInMSec\" /t REG_DWORD /d 0 /f", "Disable Startup Delay");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize"" /v ""StartupDelayInMSec"" /t REG_DWORD /d 0 /f",
+                "Disable Startup Delay");
         }
 
         private async void BtnEnableGameMode_Click(object sender, RoutedEventArgs e)
         {
-            var commands = @"
+            string batchCommands = @"
 reg add ""HKCU\Software\Microsoft\GameBar"" /v ""AutoGameModeEnabled"" /t REG_DWORD /d 1 /f
 reg add ""HKCU\Software\Microsoft\GameBar"" /v ""AllowAutoGameMode"" /t REG_DWORD /d 1 /f
 powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
 powercfg -setactive e9a42b02-d5df-448d-aa00-03f14749eb61";
-            await ExecuteGhostCommand(commands, "Enable Game Mode");
+
+            await RunBatchCommands(batchCommands, "Enable Game Mode");
         }
 
         private async void BtnDisableMitigations_Click(object sender, RoutedEventArgs e)
         {
-            var commands = @"
+            string batchCommands = @"
 reg add ""HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"" /v ""FeatureSettingsOverride"" /t REG_DWORD /d 3 /f
 reg add ""HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"" /v ""FeatureSettingsOverrideMask"" /t REG_DWORD /d 3 /f
 bcdedit /set hypervisorschedulertype off";
-            await ExecuteGhostCommand(commands, "Disable CPU Mitigations");
+
+            await RunBatchCommands(batchCommands, "Disable CPU Mitigations");
         }
 
         private async void BtnEnableGPUScheduling_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers\" /v \"HwSchMode\" /t REG_DWORD /d 2 /f", "Enable GPU Scheduling");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers"" /v ""HwSchMode"" /t REG_DWORD /d 2 /f",
+                "Enable GPU Scheduling");
         }
 
-        // Memory & Storage
+        // ===== MEMORY & STORAGE =====
+
         private async void BtnDisablePagefile_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("wmic computersystem where name=\"%computername%\" set AutomaticManagedPagefile=False & wmic pagefileset delete", "Disable Pagefile");
+            await RunBatchCommands(
+                @"wmic computersystem where name=""%computername%"" set AutomaticManagedPagefile=False
+wmic pagefileset delete",
+                "Disable Pagefile");
         }
 
         private async void BtnSetPagefile_Click(object sender, RoutedEventArgs e)
         {
-            var commands = @"
+            string batchCommands = @"
 wmic computersystem where name=""%computername%"" set AutomaticManagedPagefile=False
-wmic pagefileset where name=""C:\\pagefile.sys"" delete
+wmic pagefileset where name=""C:\pagefile.sys"" delete
 wmic pagefileset create name=""C:\pagefile.sys""
-wmic pagefileset where name=""C:\\pagefile.sys"" set InitialSize=4096,MaximumSize=4096";
-            await ExecuteGhostCommand(commands, "Set Pagefile 4GB");
+wmic pagefileset where name=""C:\pagefile.sys"" set InitialSize=4096,MaximumSize=4096";
+
+            await RunBatchCommands(batchCommands, "Set Pagefile 4GB");
         }
 
         private async void BtnDisableHibernation_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("powercfg -h off", "Disable Hibernation");
+            await RunSystemCommand("powercfg.exe", "-h off", "Disable Hibernation");
         }
 
         private async void BtnEnableHibernation_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("powercfg -h on", "Enable Hibernation");
+            await RunSystemCommand("powercfg.exe", "-h on", "Enable Hibernation");
         }
 
         private async void BtnDisableSuperfetch_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("sc config SysMain start=disabled & sc stop SysMain", "Disable Superfetch/Sysmain");
+            await RunBatchCommands(
+                @"sc config SysMain start=disabled
+sc stop SysMain",
+                "Disable Superfetch/Sysmain");
         }
 
         private async void BtnDisableFastboot_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power\" /v \"HiberbootEnabled\" /t REG_DWORD /d 0 /f", "Disable Fast Startup");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power"" /v ""HiberbootEnabled"" /t REG_DWORD /d 0 /f",
+                "Disable Fast Startup");
         }
 
         private async void BtnEnableFastboot_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Power\" /v \"HiberbootEnabled\" /t REG_DWORD /d 1 /f", "Enable Fast Startup");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power"" /v ""HiberbootEnabled"" /t REG_DWORD /d 1 /f",
+                "Enable Fast Startup");
         }
 
         private async void BtnDisableSleep_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("powercfg -x -standby-timeout-ac 0 & powercfg -x -standby-timeout-dc 0", "Disable Sleep Mode");
+            await RunBatchCommands(
+                @"powercfg -x -standby-timeout-ac 0
+powercfg -x -standby-timeout-dc 0",
+                "Disable Sleep Mode");
         }
 
         private async void BtnPagefile256_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("wmic pagefileset where name=\"C:\\\\pagefile.sys\" set InitialSize=256,MaximumSize=256", "Set Pagefile 256MB");
+            await RunSystemCommand("wmic.exe",
+                @"pagefileset where name=""C:\pagefile.sys"" set InitialSize=256,MaximumSize=256",
+                "Set Pagefile 256MB");
         }
 
         private async void BtnPagefile3GB_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("wmic pagefileset where name=\"C:\\\\pagefile.sys\" set InitialSize=3072,MaximumSize=3072", "Set Pagefile 3GB");
+            await RunSystemCommand("wmic.exe",
+                @"pagefileset where name=""C:\pagefile.sys"" set InitialSize=3072,MaximumSize=3072",
+                "Set Pagefile 3GB");
         }
 
         private async void BtnPagefile8GB_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("wmic pagefileset where name=\"C:\\\\pagefile.sys\" set InitialSize=8192,MaximumSize=8192", "Set Pagefile 8GB");
+            await RunSystemCommand("wmic.exe",
+                @"pagefileset where name=""C:\pagefile.sys"" set InitialSize=8192,MaximumSize=8192",
+                "Set Pagefile 8GB");
         }
 
         private async void BtnPagefile16GB_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("wmic pagefileset where name=\"C:\\\\pagefile.sys\" set InitialSize=16384,MaximumSize=16384", "Set Pagefile 16GB");
+            await RunSystemCommand("wmic.exe",
+                @"pagefileset where name=""C:\pagefile.sys"" set InitialSize=16384,MaximumSize=16384",
+                "Set Pagefile 16GB");
         }
+
+        // ===== THEMES & PERSONALIZATION =====
 
         private async void BtnDisableWin2077_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\" /v \"DisableAcrylicBackgroundOnLogon\" /t REG_DWORD /d 1 /f", "Disable Windows 2077 Blur Effect");
-        }
-
-        private async void BtnStopStartup_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("taskmgr", "Open Task Manager to manage startup programs");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKLM\SOFTWARE\Policies\Microsoft\Windows\System"" /v ""DisableAcrylicBackgroundOnLogon"" /t REG_DWORD /d 1 /f",
+                "Disable Windows 2077 Blur Effect");
         }
 
         private async void BtnYellowTheme_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"ColorizationColor\" /t REG_DWORD /d 0xC4FFFF00 /f & reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"AccentColor\" /t REG_DWORD /d 0xFFFFFF00 /f", "Yellow Theme");
+            await RunBatchCommands(
+                @"reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""ColorizationColor"" /t REG_DWORD /d 0xC4FFFF00 /f
+reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""AccentColor"" /t REG_DWORD /d 0xFFFFFF00 /f",
+                "Yellow Theme");
         }
 
         private async void BtnCyanTheme_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"ColorizationColor\" /t REG_DWORD /d 0xC400FFFF /f & reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"AccentColor\" /t REG_DWORD /d 0xFF00FFFF /f", "Cyan Theme");
+            await RunBatchCommands(
+                @"reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""ColorizationColor"" /t REG_DWORD /d 0xC400FFFF /f
+reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""AccentColor"" /t REG_DWORD /d 0xFF00FFFF /f",
+                "Cyan Theme");
         }
 
         private async void BtnBrownTheme_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"ColorizationColor\" /t REG_DWORD /d 0xC48B4513 /f & reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"AccentColor\" /t REG_DWORD /d 0xFF8B4513 /f", "Brown Theme");
+            await RunBatchCommands(
+                @"reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""ColorizationColor"" /t REG_DWORD /d 0xC48B4513 /f
+reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""AccentColor"" /t REG_DWORD /d 0xFF8B4513 /f",
+                "Brown Theme");
         }
 
         private async void BtnGrayTheme_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"ColorizationColor\" /t REG_DWORD /d 0xC4808080 /f & reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"AccentColor\" /t REG_DWORD /d 0xFF808080 /f", "Gray Theme");
+            await RunBatchCommands(
+                @"reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""ColorizationColor"" /t REG_DWORD /d 0xC4808080 /f
+reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""AccentColor"" /t REG_DWORD /d 0xFF808080 /f",
+                "Gray Theme");
         }
+
+        private async void BtnPurpleTheme_Click(object sender, RoutedEventArgs e)
+        {
+            await RunBatchCommands(
+                @"reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""ColorizationColor"" /t REG_DWORD /d 0xC44595D64 /f
+reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""AccentColor"" /t REG_DWORD /d 0xFF8856D6 /f",
+                "Purple Theme");
+        }
+
+        private async void BtnPinkTheme_Click(object sender, RoutedEventArgs e)
+        {
+            await RunBatchCommands(
+                @"reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""ColorizationColor"" /t REG_DWORD /d 0xC4E81DB4 /f
+reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""AccentColor"" /t REG_DWORD /d 0xFFE81DB4 /f",
+                "Pink Theme");
+        }
+
+        private async void BtnBlueTheme_Click(object sender, RoutedEventArgs e)
+        {
+            await RunBatchCommands(
+                @"reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""ColorizationColor"" /t REG_DWORD /d 0xC40078D7 /f
+reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""AccentColor"" /t REG_DWORD /d 0xFF0078D7 /f",
+                "Blue Theme");
+        }
+
+        private async void BtnGreenTheme_Click(object sender, RoutedEventArgs e)
+        {
+            await RunBatchCommands(
+                @"reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""ColorizationColor"" /t REG_DWORD /d 0xC400CC6A /f
+reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""AccentColor"" /t REG_DWORD /d 0xFF00CC6A /f",
+                "Green Theme");
+        }
+
+        private async void BtnRedTheme_Click(object sender, RoutedEventArgs e)
+        {
+            await RunBatchCommands(
+                @"reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""ColorizationColor"" /t REG_DWORD /d 0xC4E74856 /f
+reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""AccentColor"" /t REG_DWORD /d 0xFFE74856 /f",
+                "Red Theme");
+        }
+
+        private async void BtnOrangeTheme_Click(object sender, RoutedEventArgs e)
+        {
+            await RunBatchCommands(
+                @"reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""ColorizationColor"" /t REG_DWORD /d 0xC4FF8C00 /f
+reg add ""HKCU\Software\Microsoft\Windows\DWM"" /v ""AccentColor"" /t REG_DWORD /d 0xFFFF8C00 /f",
+                "Orange Theme");
+        }
+
+        private async void BtnDarkMode_Click(object sender, RoutedEventArgs e)
+        {
+            await RunBatchCommands(
+                @"reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"" /v ""AppsUseLightTheme"" /t REG_DWORD /d 0 /f
+reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"" /v ""SystemUsesLightTheme"" /t REG_DWORD /d 0 /f",
+                "Enable Dark Mode");
+        }
+
+        private async void BtnLightMode_Click(object sender, RoutedEventArgs e)
+        {
+            await RunBatchCommands(
+                @"reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"" /v ""AppsUseLightTheme"" /t REG_DWORD /d 1 /f
+reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"" /v ""SystemUsesLightTheme"" /t REG_DWORD /d 1 /f",
+                "Enable Light Mode");
+        }
+
+        // ===== SYSTEM CLEANUP & OPTIMIZATION =====
 
         private async void BtnUncompactOS_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("compact /compactos:never", "Uncompact OS");
+            await RunSystemCommand("compact.exe", "/compactos:never", "Uncompact OS");
         }
 
         private async void BtnCleanCache_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("del /q /f /s %TEMP%\\* & del /q /f /s C:\\Windows\\Prefetch\\*", "Clean Cache & Prefetch");
+            await RunBatchCommands(
+                @"del /q /f /s %TEMP%\*
+del /q /f /s C:\Windows\Prefetch\*",
+                "Clean Cache & Prefetch");
         }
 
         private async void BtnOptimizeDelivery_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DeliveryOptimization\" /v \"DODownloadMode\" /t REG_DWORD /d 0 /f", "Disable Delivery Optimization");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization"" /v ""DODownloadMode"" /t REG_DWORD /d 0 /f",
+                "Disable Delivery Optimization");
         }
 
         private async void BtnCleanWindowsOld_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("rd /s /q C:\\Windows.old", "Delete Windows.old Folder");
+            await RunSystemCommand("cmd.exe", @"/c rd /s /q C:\Windows.old", "Delete Windows.old Folder");
         }
 
         private async void BtnFixStore_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("wsreset.exe", "Reset Windows Store");
+            await RunSystemCommand("wsreset.exe", "", "Reset Windows Store", false);
         }
 
         private async void BtnSystemCheck_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("sfc /scannow", "System File Checker");
+            await RunSystemCommand("sfc.exe", "/scannow", "System File Checker");
         }
 
         private async void BtnResetNetwork_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("netsh winsock reset & netsh int ip reset & ipconfig /flushdns", "Reset Network Settings");
+            await RunBatchCommands(
+                @"netsh winsock reset
+netsh int ip reset
+ipconfig /flushdns",
+                "Reset Network Settings");
         }
 
         private async void BtnCleanPrefetch_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("del /q /f /s C:\\Windows\\Prefetch\\*", "Clean Prefetch");
+            await RunSystemCommand("cmd.exe", @"/c del /q /f /s C:\Windows\Prefetch\*", "Clean Prefetch");
         }
 
         private async void BtnCompactOS_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("compact /compactos:always", "Compact OS (LZX)");
+            await RunSystemCommand("compact.exe", "/compactos:always", "Compact OS (LZX)");
         }
 
-        // Windows Updates & Services
+        private async void BtnCleanTemp_Click(object sender, RoutedEventArgs e)
+        {
+            await RunBatchCommands(
+                @"del /q /f /s %TEMP%\*
+del /q /f /s C:\Windows\Temp\*
+del /q /f /s C:\Windows\Prefetch\*",
+                "Clean Temp Files");
+        }
+
+        private async void BtnCleanStore_Click(object sender, RoutedEventArgs e)
+        {
+            await RunSystemCommand("wsreset.exe", "", "Clean Store Cache", false);
+        }
+
+        private async void BtnDiskCleanup_Click(object sender, RoutedEventArgs e)
+        {
+            await RunSystemCommand("cleanmgr.exe", "/sagerun:1", "Disk Cleanup");
+        }
+
+        private async void BtnClearEventLogs_Click(object sender, RoutedEventArgs e)
+        {
+            await RunSystemCommand("cmd.exe",
+                @"/c for /F ""tokens=*"" %1 in ('wevtutil.exe el') DO wevtutil.exe cl ""%1""",
+                "Clear Event Logs");
+        }
+
+        // ===== WINDOWS UPDATES & SERVICES =====
+
         private async void BtnStopUpdates_Click(object sender, RoutedEventArgs e)
         {
-            var commands = @"
+            string batchCommands = @"
 reg add ""HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"" /v ""PauseFeatureUpdatesStartTime"" /t REG_SZ /d ""2024-01-01T00:00:00Z"" /f
 reg add ""HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"" /v ""PauseFeatureUpdatesEndTime"" /t REG_SZ /d ""2050-01-01T00:00:00Z"" /f
 reg add ""HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"" /v ""PauseQualityUpdatesStartTime"" /t REG_SZ /d ""2024-01-01T00:00:00Z"" /f
 reg add ""HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"" /v ""PauseQualityUpdatesEndTime"" /t REG_SZ /d ""2050-01-01T00:00:00Z"" /f
 reg add ""HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"" /v ""PauseUpdatesExpiryTime"" /t REG_SZ /d ""2050-01-01T00:00:00Z"" /f";
-            await ExecuteGhostCommand(commands, "Stop Updates Until 2050");
+
+            await RunBatchCommands(batchCommands, "Stop Updates Until 2050");
         }
 
         private async void BtnEnableUpdates_Click(object sender, RoutedEventArgs e)
         {
-            var commands = @"
+            string batchCommands = @"
 reg delete ""HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"" /v ""PauseFeatureUpdatesStartTime"" /f
 reg delete ""HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"" /v ""PauseFeatureUpdatesEndTime"" /f
 reg delete ""HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"" /v ""PauseQualityUpdatesStartTime"" /f
 reg delete ""HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"" /v ""PauseQualityUpdatesEndTime"" /f
 reg delete ""HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings"" /v ""PauseUpdatesExpiryTime"" /f";
-            await ExecuteGhostCommand(commands, "Enable Updates");
+
+            await RunBatchCommands(batchCommands, "Enable Updates");
         }
 
         private async void BtnDisableCortana_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search\" /v \"AllowCortana\" /t REG_DWORD /d 0 /f", "Disable Cortana");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search"" /v ""AllowCortana"" /t REG_DWORD /d 0 /f",
+                "Disable Cortana");
         }
 
-        private async void BtnCleanTemp_Click(object sender, RoutedEventArgs e)
-        {
-            var commands = @"
-del /q /f /s %TEMP%\*
-del /q /f /s C:\Windows\Temp\*
-del /q /f /s C:\Windows\Prefetch\*";
-            await ExecuteGhostCommand(commands, "Clean Temp Files");
-        }
+        // ===== REGISTRY & EXPLORER =====
 
-        // Registry & Explorer
         private async void BtnTakeOwnership_Click(object sender, RoutedEventArgs e)
         {
-            var commands = @"
+            string batchCommands = @"
 reg add ""HKCR\*\shell\runas"" /ve /d ""Take Ownership"" /f
 reg add ""HKCR\*\shell\runas"" /v ""NoWorkingDirectory"" /t REG_SZ /d """" /f
 reg add ""HKCR\*\shell\runas\command"" /ve /d ""cmd.exe /c takeown /f \""%1\"" && icacls \""%1\"" /grant administrators:F"" /f
 reg add ""HKCR\*\shell\runas\command"" /v ""IsolatedCommand"" /d ""cmd.exe /c takeown /f \""%1\"" && icacls \""%1\"" /grant administrators:F"" /f
 reg add ""HKCR\Directory\shell\runas"" /ve /d ""Take Ownership"" /f
 reg add ""HKCR\Directory\shell\runas\command"" /ve /d ""cmd.exe /c takeown /f \""%1\"" /r /d y && icacls \""%1\"" /grant administrators:F /t"" /f";
-            await ExecuteGhostCommand(commands, "Add Take Ownership");
+
+            await RunBatchCommands(batchCommands, "Add Take Ownership");
         }
 
         private async void BtnDisableBlur_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\System\" /v \"DisableAcrylicBackgroundOnLogon\" /t REG_DWORD /d 1 /f", "Disable Login Blur");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKLM\SOFTWARE\Policies\Microsoft\Windows\System"" /v ""DisableAcrylicBackgroundOnLogon"" /t REG_DWORD /d 1 /f",
+                "Disable Login Blur");
         }
 
         private async void BtnDisableRibbon_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Ribbon\" /v \"MinimizedStateTabletModeOff\" /t REG_DWORD /d 1 /f", "Disable Explorer Ribbon");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Ribbon"" /v ""MinimizedStateTabletModeOff"" /t REG_DWORD /d 1 /f",
+                "Disable Explorer Ribbon");
         }
 
         private async void BtnEnableRibbon_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Ribbon\" /v \"MinimizedStateTabletModeOff\" /t REG_DWORD /d 0 /f", "Enable Explorer Ribbon");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Ribbon"" /v ""MinimizedStateTabletModeOff"" /t REG_DWORD /d 0 /f",
+                "Enable Explorer Ribbon");
         }
 
-        private async void BtnDarkMode_Click(object sender, RoutedEventArgs e)
+        // ===== ACTION CENTER & PERSONALIZATION =====
+
+        private async void BtnDisableActionCenter_Click(object sender, RoutedEventArgs e)
         {
-            var commands = @"
-reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"" /v ""AppsUseLightTheme"" /t REG_DWORD /d 0 /f
-reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"" /v ""SystemUsesLightTheme"" /t REG_DWORD /d 0 /f";
-            await ExecuteGhostCommand(commands, "Enable Dark Mode");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKCU\Software\Policies\Microsoft\Windows\Explorer"" /v ""DisableNotificationCenter"" /t REG_DWORD /d 1 /f",
+                "Disable Action Center");
         }
 
-        private async void BtnLightMode_Click(object sender, RoutedEventArgs e)
+        private async void BtnEnableActionCenter_Click(object sender, RoutedEventArgs e)
         {
-            var commands = @"
-reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"" /v ""AppsUseLightTheme"" /t REG_DWORD /d 1 /f
-reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"" /v ""SystemUsesLightTheme"" /t REG_DWORD /d 1 /f";
-            await ExecuteGhostCommand(commands, "Enable Light Mode");
+            await RunSystemCommand("reg.exe",
+                @"delete ""HKCU\Software\Policies\Microsoft\Windows\Explorer"" /v ""DisableNotificationCenter"" /f",
+                "Enable Action Center");
         }
 
-        // System Cleanup
-        private async void BtnClearEventLogs_Click(object sender, RoutedEventArgs e)
+        private async void BtnDisableNotifications_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("for /F \"tokens=*\" %1 in ('wevtutil.exe el') DO wevtutil.exe cl \"%1\"", "Clear Event Logs");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKCU\Software\Microsoft\Windows\CurrentVersion\PushNotifications"" /v ""ToastEnabled"" /t REG_DWORD /d 0 /f",
+                "Disable Notifications");
         }
 
-        private async void BtnCleanStore_Click(object sender, RoutedEventArgs e)
+        private async void BtnEnableNotifications_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("wsreset", "Clean Store Cache");
+            await RunSystemCommand("reg.exe",
+                @"add ""HKCU\Software\Microsoft\Windows\CurrentVersion\PushNotifications"" /v ""ToastEnabled"" /t REG_DWORD /d 1 /f",
+                "Enable Notifications");
         }
 
-        private async void BtnDiskCleanup_Click(object sender, RoutedEventArgs e)
+        // ===== GUI APPLICATIONS =====
+
+        private async void BtnStopStartup_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("cleanmgr /sagerun:1", "Disk Cleanup");
+            await OpenApplicationAsync("taskmgr.exe", "", "Open Task Manager", false);
         }
 
         private async void BtnDefrag_Click(object sender, RoutedEventArgs e)
         {
-            await ExecuteGhostCommand("dfrgui", "Defragment");
+            await OpenApplicationAsync("dfrgui.exe", "", "Defragment", false);
         }
 
-        // Helper method for Ghost Toolbox commands
-        private async Task ExecuteGhostCommand(string psScript, string featureName)
+        private async void BtnUserManagement_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                var confirmed = await ShowConfirmDialogAsync(
-                    "Xác nhận",
-                    $"Bạn có chắc muốn thực hiện: {featureName}?\n\nYêu cầu quyền Administrator."
-                );
-                if (!confirmed) return;
-
-                ShowBusy($"Đang áp dụng {featureName}...");
-                SetStatus($"Đang áp dụng {featureName}...", InfoBarSeverity.Informational);
-
-                if (string.IsNullOrWhiteSpace(psScript))
-                {
-                    throw new ArgumentException("PowerShell script không được rỗng");
-                }
-
-                // Clean script
-                psScript = psScript.Trim();
-                if (psScript.StartsWith("powershell", StringComparison.OrdinalIgnoreCase))
-                {
-                    var match = System.Text.RegularExpressions.Regex.Match(
-                        psScript,
-                        @"^powershell(?:\.exe)?\s+(?:-Command|-c)\s+""(.+)""$",
-                        System.Text.RegularExpressions.RegexOptions.IgnoreCase |
-                        System.Text.RegularExpressions.RegexOptions.Singleline
-                    );
-
-                    if (match.Success)
-                    {
-                        psScript = match.Groups[1].Value.Replace("\\\"", "\"");
-                    }
-                }
-
-                // Encode script to Base64 để tránh mọi vấn đề về escape
-                var bytes = Encoding.Unicode.GetBytes(psScript);
-                var encodedScript = Convert.ToBase64String(bytes);
-
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "powershell.exe",
-                        Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedScript}",
-                        UseShellExecute = true,
-                        Verb = "runas",
-                        CreateNoWindow = false,
-                        RedirectStandardOutput = false,
-                        RedirectStandardError = false
-                    }
-                };
-
-                try
-                {
-                    process.Start();
-                }
-                catch (System.ComponentModel.Win32Exception win32Ex)
-                {
-                    if (win32Ex.NativeErrorCode == 1223)
-                    {
-                        SetStatus("Đã hủy bởi người dùng", InfoBarSeverity.Warning);
-                        return;
-                    }
-                    throw;
-                }
-
-                await process.WaitForExitAsync();
-
-                if (process.ExitCode == 0)
-                {
-                    SetStatus($"Thành công: {featureName}", InfoBarSeverity.Success);
-                    ShowSnackbar("Thành công", featureName, ControlAppearance.Success);
-                }
-                else
-                {
-                    SetStatus($"Thất bại: {featureName} (Exit code: {process.ExitCode})", InfoBarSeverity.Error);
-                    ShowSnackbar("Thất bại", $"{featureName} - Exit code: {process.ExitCode}", ControlAppearance.Danger);
-                }
-            }
-            catch (Exception ex)
-            {
-                SetStatus("Lỗi Installer", InfoBarSeverity.Error);
-                await ShowInfoDialogAsync("Lỗi", ex.Message);
-            }
-            finally
-            {
-                HideBusy();
-            }
+            await OpenApplicationAsync("netplwiz.exe", "", "User Management", false);
         }
 
-        // ===== Ghost Toolbox Installer Features =====
+        private async void BtnWingetManager_Click(object sender, RoutedEventArgs e)
+        {
+            await OpenApplicationAsync("ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1", "", "Windows Package Manager", false);
+        }
+
+        private async void BtnWindowsRecovery_Click(object sender, RoutedEventArgs e)
+        {
+            await OpenApplicationAsync("RecoveryDrive.exe", "", "Windows Recovery Drive", true);
+        }
+
+        // ===== UWP APPS MANAGEMENT =====
+
+        private async void BtnInstallStore_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage -AllUsers Microsoft.WindowsStore | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \"$($_.InstallLocation)\\AppXManifest.xml\"}";
+            await RunPowerShellCommand(script, "Install Microsoft Store");
+        }
+
+        private async void BtnRemoveStore_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage *WindowsStore* | Remove-AppxPackage";
+            await RunPowerShellCommand(script, "Remove Microsoft Store");
+        }
+
+        private async void BtnInstallXbox_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage -AllUsers *Xbox* | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \"$($_.InstallLocation)\\AppXManifest.xml\"}";
+            await RunPowerShellCommand(script, "Install Xbox Apps");
+        }
+
+        private async void BtnRemoveXbox_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage *Xbox* | Remove-AppxPackage";
+            await RunPowerShellCommand(script, "Remove Xbox Apps");
+        }
+
+        private async void BtnInstallOfficeHub_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage -AllUsers Microsoft.MicrosoftOfficeHub | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \"$($_.InstallLocation)\\AppXManifest.xml\"}";
+            await RunPowerShellCommand(script, "Install Office Hub");
+        }
+
+        private async void BtnInstallOneDrive_Click(object sender, RoutedEventArgs e)
+        {
+            await RunSystemCommand("cmd.exe", "/c \"%SystemRoot%\\SysWOW64\\OneDriveSetup.exe\"", "Install OneDrive");
+        }
+
+        private async void BtnInstallCalculator_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage -AllUsers Microsoft.WindowsCalculator | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \"$($_.InstallLocation)\\AppXManifest.xml\"}";
+            await RunPowerShellCommand(script, "Cài đặt Máy tính");
+        }
+
+        private async void BtnRemoveCalculator_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage *WindowsCalculator* | Remove-AppxPackage";
+            await RunPowerShellCommand(script, "Gỡ bỏ Máy tính");
+        }
+
+        private async void BtnInstallPhotos_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage -AllUsers Microsoft.Windows.Photos | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \"$($_.InstallLocation)\\AppXManifest.xml\"}";
+            await RunPowerShellCommand(script, "Cài đặt Hình ảnh");
+        }
+
+        private async void BtnRemovePhotos_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage *Photos* | Remove-AppxPackage";
+            await RunPowerShellCommand(script, "Gỡ bỏ Hình ảnh");
+        }
+
+        private async void BtnInstallCamera_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage -AllUsers Microsoft.WindowsCamera | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \"$($_.InstallLocation)\\AppXManifest.xml\"}";
+            await RunPowerShellCommand(script, "Cài đặt Camera");
+        }
+
+        private async void BtnRemoveCamera_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage *WindowsCamera* | Remove-AppxPackage";
+            await RunPowerShellCommand(script, "Gỡ bỏ Camera");
+        }
+
+        private async void BtnInstallMaps_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage -AllUsers Microsoft.WindowsMaps | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \"$($_.InstallLocation)\\AppXManifest.xml\"}";
+            await RunPowerShellCommand(script, "Cài đặt Bản đồ");
+        }
+
+        private async void BtnRemoveMaps_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage *WindowsMaps* | Remove-AppxPackage";
+            await RunPowerShellCommand(script, "Gỡ bỏ Bản đồ");
+        }
+
+        private async void BtnInstallWeather_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage -AllUsers Microsoft.BingWeather | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \"$($_.InstallLocation)\\AppXManifest.xml\"}";
+            await RunPowerShellCommand(script, "Cài đặt Thời tiết");
+        }
+
+        private async void BtnRemoveWeather_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage *BingWeather* | Remove-AppxPackage";
+            await RunPowerShellCommand(script, "Gỡ bỏ Thời tiết");
+        }
+
+        private async void BtnInstallNews_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage -AllUsers Microsoft.BingNews | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \"$($_.InstallLocation)\\AppXManifest.xml\"}";
+            await RunPowerShellCommand(script, "Cài đặt Tin tức");
+        }
+
+        private async void BtnRemoveNews_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage *BingNews* | Remove-AppxPackage";
+            await RunPowerShellCommand(script, "Gỡ bỏ Tin tức");
+        }
+
+        private async void BtnInstallSolitaire_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage -AllUsers Microsoft.MicrosoftSolitaireCollection | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \"$($_.InstallLocation)\\AppXManifest.xml\"}";
+            await RunPowerShellCommand(script, "Cài đặt Solitaire");
+        }
+
+        private async void BtnRemoveSolitaire_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage *Solitaire* | Remove-AppxPackage";
+            await RunPowerShellCommand(script, "Gỡ bỏ Solitaire");
+        }
+
+        private async void BtnInstallClipchamp_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage -AllUsers Clipchamp.Clipchamp | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \"$($_.InstallLocation)\\AppXManifest.xml\"}";
+            await RunPowerShellCommand(script, "Cài đặt Clipchamp");
+        }
+
+        private async void BtnRemoveClipchamp_Click(object sender, RoutedEventArgs e)
+        {
+            string script = "Get-AppxPackage *Clipchamp* | Remove-AppxPackage";
+            await RunPowerShellCommand(script, "Gỡ bỏ Clipchamp");
+        }
+
+        // ===== ADVANCED TOOLS =====
+
+        private async void BtnInstallDotNet_Click(object sender, RoutedEventArgs e)
+        {
+            await RunSystemCommand("dism.exe", "/online /enable-feature /featurename:NetFX3 /all", "Install .NET Framework 3.5");
+        }
+
+        private async void BtnInstallDirectX_Click(object sender, RoutedEventArgs e)
+        {
+            await OpenApplicationAsync("https://www.microsoft.com/en-us/download/details.aspx?id=35", "", "Download DirectX", false);
+        }
+
+        private async void BtnInstallVCRedist_Click(object sender, RoutedEventArgs e)
+        {
+            await OpenApplicationAsync("https://aka.ms/vs/17/release/vc_redist.x64.exe", "", "Download VC Redist", false);
+        }
+
+        private async void BtnDiskBenchmark_Click(object sender, RoutedEventArgs e)
+        {
+            await RunSystemCommand("winsat.exe", "disk -drive c", "Disk Benchmark");
+        }
+
+        private async void BtnCMDColors_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowInfoDialogAsync("CMD Colors",
+                "CMD Color Schemes:\n\nXem thêm tại: https://github.com/mbadolato/iTerm2-Color-Schemes\n\n" +
+                "Các theme phổ biến:\n- Dracula\n- Monokai\n- Solarized\n- Nord\n- One Dark");
+        }
+
+        private async void BtnSoundMods_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowInfoDialogAsync("Sound Mods",
+                "Sound Mods:\n\n- Dolby Atmos for Headphones\n- DTS Sound Unbound\n- Windows Sonic for Headphones\n\n" +
+                "Mở Settings > Sound > Spatial Sound để cấu hình");
+        }
+
+        // ===== INSTALLER FEATURES =====
 
         private async void BtnInstallEdge_Click(object sender, RoutedEventArgs e)
         {
@@ -3614,221 +4018,17 @@ reg add ""HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"" /v
             }
         }
 
-        // UWP Apps Management
-        private async void BtnInstallStore_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage -AllUsers Microsoft.WindowsStore | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \\\"$($_.InstallLocation)\\AppXManifest.xml\\\"}\"", "Install Microsoft Store");
-        }
+        // ===== HELPER METHODS =====
 
-        private async void BtnRemoveStore_Click(object sender, RoutedEventArgs e)
+        private bool IsGUIApplication(string fileName)
         {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage *WindowsStore* | Remove-AppxPackage\"", "Remove Microsoft Store");
-        }
+            var guiApps = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "taskmgr.exe", "dfrgui.exe", "netplwiz.exe", "control.exe", "explorer.exe",
+            "ms-windows-store", "http://", "https://", "recoverydrive.exe"
+        };
 
-        private async void BtnInstallXbox_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage -AllUsers *Xbox* | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \\\"$($_.InstallLocation)\\AppXManifest.xml\\\"}\"", "Install Xbox Apps");
-        }
-
-        private async void BtnRemoveXbox_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage *Xbox* | Remove-AppxPackage\"", "Remove Xbox Apps");
-        }
-
-        private async void BtnInstallOfficeHub_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage -AllUsers Microsoft.MicrosoftOfficeHub | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \\\"$($_.InstallLocation)\\AppXManifest.xml\\\"}\"", "Install Office Hub");
-        }
-
-        private async void BtnInstallOneDrive_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Start-Process \\\"$env:SystemRoot\\SysWOW64\\OneDriveSetup.exe\\\"\"", "Install OneDrive");
-        }
-
-        // Calculator
-        private async void BtnInstallCalculator_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage -AllUsers Microsoft.WindowsCalculator | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \\\"$($_.InstallLocation)\\AppXManifest.xml\\\"}\"", "Cài đặt Máy tính");
-        }
-
-        private async void BtnRemoveCalculator_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage *WindowsCalculator* | Remove-AppxPackage\"", "Gỡ bỏ Máy tính");
-        }
-
-        // Photos
-        private async void BtnInstallPhotos_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage -AllUsers Microsoft.Windows.Photos | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \\\"$($_.InstallLocation)\\AppXManifest.xml\\\"}\"", "Cài đặt Hình ảnh");
-        }
-
-        private async void BtnRemovePhotos_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage *Photos* | Remove-AppxPackage\"", "Gỡ bỏ Hình ảnh");
-        }
-
-        // Camera
-        private async void BtnInstallCamera_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage -AllUsers Microsoft.WindowsCamera | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \\\"$($_.InstallLocation)\\AppXManifest.xml\\\"}\"", "Cài đặt Camera");
-        }
-
-        private async void BtnRemoveCamera_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage *WindowsCamera* | Remove-AppxPackage\"", "Gỡ bỏ Camera");
-        }
-
-        // Maps
-        private async void BtnInstallMaps_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage -AllUsers Microsoft.WindowsMaps | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \\\"$($_.InstallLocation)\\AppXManifest.xml\\\"}\"", "Cài đặt Bản đồ");
-        }
-
-        private async void BtnRemoveMaps_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage *WindowsMaps* | Remove-AppxPackage\"", "Gỡ bỏ Bản đồ");
-        }
-
-        // Weather
-        private async void BtnInstallWeather_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage -AllUsers Microsoft.BingWeather | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \\\"$($_.InstallLocation)\\AppXManifest.xml\\\"}\"", "Cài đặt Thời tiết");
-        }
-
-        private async void BtnRemoveWeather_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage *BingWeather* | Remove-AppxPackage\"", "Gỡ bỏ Thời tiết");
-        }
-
-        // News
-        private async void BtnInstallNews_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage -AllUsers Microsoft.BingNews | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \\\"$($_.InstallLocation)\\AppXManifest.xml\\\"}\"", "Cài đặt Tin tức");
-        }
-
-        private async void BtnRemoveNews_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage *BingNews* | Remove-AppxPackage\"", "Gỡ bỏ Tin tức");
-        }
-
-        // Solitaire
-        private async void BtnInstallSolitaire_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage -AllUsers Microsoft.MicrosoftSolitaireCollection | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \\\"$($_.InstallLocation)\\AppXManifest.xml\\\"}\"", "Cài đặt Solitaire");
-        }
-
-        private async void BtnRemoveSolitaire_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage *Solitaire* | Remove-AppxPackage\"", "Gỡ bỏ Solitaire");
-        }
-
-        // Clipchamp
-        private async void BtnInstallClipchamp_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage -AllUsers Clipchamp.Clipchamp | Foreach {Add-AppxPackage -DisableDevelopmentMode -Register \\\"$($_.InstallLocation)\\AppXManifest.xml\\\"}\"", "Cài đặt Clipchamp");
-        }
-
-        private async void BtnRemoveClipchamp_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("powershell -Command \"Get-AppxPackage *Clipchamp* | Remove-AppxPackage\"", "Gỡ bỏ Clipchamp");
-        }
-
-        // Action Center & Personalization
-        private async void BtnDisableActionCenter_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Policies\\Microsoft\\Windows\\Explorer\" /v \"DisableNotificationCenter\" /t REG_DWORD /d 1 /f", "Disable Action Center");
-        }
-
-        private async void BtnEnableActionCenter_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("reg delete \"HKCU\\Software\\Policies\\Microsoft\\Windows\\Explorer\" /v \"DisableNotificationCenter\" /f", "Enable Action Center");
-        }
-
-        private async void BtnDisableNotifications_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PushNotifications\" /v \"ToastEnabled\" /t REG_DWORD /d 0 /f", "Disable Notifications");
-        }
-
-        private async void BtnEnableNotifications_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PushNotifications\" /v \"ToastEnabled\" /t REG_DWORD /d 1 /f", "Enable Notifications");
-        }
-
-        // Windows Theme Colors
-        private async void BtnPurpleTheme_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"ColorizationColor\" /t REG_DWORD /d 0xC44595D64 /f & reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"AccentColor\" /t REG_DWORD /d 0xFF8856D6 /f", "Purple Theme");
-        }
-
-        private async void BtnPinkTheme_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"ColorizationColor\" /t REG_DWORD /d 0xC4E81DB4 /f & reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"AccentColor\" /t REG_DWORD /d 0xFFE81DB4 /f", "Pink Theme");
-        }
-
-        private async void BtnBlueTheme_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"ColorizationColor\" /t REG_DWORD /d 0xC40078D7 /f & reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"AccentColor\" /t REG_DWORD /d 0xFF0078D7 /f", "Blue Theme");
-        }
-
-        private async void BtnGreenTheme_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"ColorizationColor\" /t REG_DWORD /d 0xC400CC6A /f & reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"AccentColor\" /t REG_DWORD /d 0xFF00CC6A /f", "Green Theme");
-        }
-
-        private async void BtnRedTheme_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"ColorizationColor\" /t REG_DWORD /d 0xC4E74856 /f & reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"AccentColor\" /t REG_DWORD /d 0xFFE74856 /f", "Red Theme");
-        }
-
-        private async void BtnOrangeTheme_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"ColorizationColor\" /t REG_DWORD /d 0xC4FF8C00 /f & reg add \"HKCU\\Software\\Microsoft\\Windows\\DWM\" /v \"AccentColor\" /t REG_DWORD /d 0xFFFF8C00 /f", "Orange Theme");
-        }
-
-        // Other Advanced Tools
-        private async void BtnWindowsRecovery_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("RecoveryDrive.exe", "Windows Recovery Drive");
-        }
-
-        private async void BtnInstallDotNet_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("dism /online /enable-feature /featurename:NetFX3 /all", "Install .NET Framework 3.5");
-        }
-
-        private async void BtnInstallDirectX_Click(object sender, RoutedEventArgs e)
-        {
-            await Task.Run(() => Process.Start(new ProcessStartInfo { FileName = "https://www.microsoft.com/en-us/download/details.aspx?id=35", UseShellExecute = true }));
-        }
-
-        private async void BtnInstallVCRedist_Click(object sender, RoutedEventArgs e)
-        {
-            await Task.Run(() => Process.Start(new ProcessStartInfo { FileName = "https://aka.ms/vs/17/release/vc_redist.x64.exe", UseShellExecute = true }));
-        }
-
-        private async void BtnDiskBenchmark_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("winsat disk -drive c", "Disk Benchmark");
-        }
-
-        private async void BtnCMDColors_Click(object sender, RoutedEventArgs e)
-        {
-            await ShowInfoDialogAsync("CMD Colors", "CMD Color Schemes:\n\nXem thêm tại: https://github.com/mbadolato/iTerm2-Color-Schemes\n\nCác theme phổ biến:\n- Dracula\n- Monokai\n- Solarized\n- Nord\n- One Dark");
-        }
-
-        private async void BtnSoundMods_Click(object sender, RoutedEventArgs e)
-        {
-            await ShowInfoDialogAsync("Sound Mods", "Sound Mods:\n\n- Dolby Atmos for Headphones\n- DTS Sound Unbound\n- Windows Sonic for Headphones\n\nMở Settings > Sound > Spatial Sound để cấu hình");
-        }
-
-        private async void BtnUserManagement_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("netplwiz", "User Management");
-        }
-
-        private async void BtnWingetManager_Click(object sender, RoutedEventArgs e)
-        {
-            await ExecuteGhostCommand("start ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1", "Windows Package Manager");
+            return guiApps.Any(app => fileName.Contains(app, StringComparison.OrdinalIgnoreCase));
         }
 
         // Quick Tools Event Handlers

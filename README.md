@@ -1,12 +1,12 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)
 
-**Công cụ kích hoạt Windows và Office mạnh mẽ, dễ dàng, nhanh chóng và miễn phí**
+**Công cụ tất cả trong một (all in one), dễ dàng, nhanh chóng và miễn phí**
 
 [Tải xuống](https://github.com/AlexHerrySeek/ZibllWindows/releases) • [Báo lỗi](https://github.com/AlexHerrySeek/ZibllWindows/issues) • [Góp ý](https://github.com/AlexHerrySeek/ZibllWindows/discussions)
 

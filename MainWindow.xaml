@@ -85,7 +85,7 @@
                                    FontSize="36" 
                                    FontWeight="Bold"
                                    Margin="0,0,0,8"/>
-                        <TextBlock Text="Công cụ kích hoạt Windows và Office mạnh mẽ, dễ dàng, nhanh chóng và miễn phí, và công cụ có sẵn dành cho bạn." 
+                        <TextBlock Text="Công cụ Tất Cả Trong Một (All In One) mạnh mẽ, dễ dàng, nhanh chóng và miễn phí, và công cụ có sẵn dành cho bạn." 
                                    FontSize="15" 
                                    Opacity="0.7"
                                    TextWrapping="Wrap"
@@ -2480,149 +2480,160 @@
 
                     <!-- Help Page -->
                     <StackPanel x:Name="HelpPage" Visibility="Collapsed">
-                        <TextBlock Text="Hướng dẫn sử dụng" 
-                                   FontSize="36" 
-                                   FontWeight="Bold"
-                                   Margin="0,0,0,8"/>
-                        <TextBlock Text="Thông tin chi tiết về cách sử dụng và phương pháp kích hoạt" 
-                                   FontSize="15" 
-                                   Opacity="0.7"
-                                   Margin="0,0,0,30"/>
+                        <TextBlock Text="Kích hoạt bằng Product Key" 
+               FontSize="36" 
+               FontWeight="Bold"
+               Margin="0,0,0,8"/>
+                        <TextBlock Text="Nhập Product Key hợp lệ để kích hoạt Windows hoặc Office" 
+               FontSize="15" 
+               Opacity="0.7"
+               Margin="0,0,0,30"/>
 
+                        <!-- Kích hoạt Windows bằng Key -->
                         <ui:Card Padding="25" Margin="0,0,0,15">
                             <StackPanel>
-                                <TextBlock Text="Kích hoạt Windows" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,15"/>
-                                
+                                <TextBlock Text="Kích hoạt Windows bằng Key" 
+                       FontSize="20" 
+                       FontWeight="SemiBold" 
+                       Margin="0,0,0,15"/>
+
                                 <Grid Margin="0,0,0,15">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Border Width="40" Height="40" Background="#10FFFFFF" CornerRadius="8" Margin="0,0,15,0">
-                                        <TextBlock Text="1" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="HWID (Permanent) - Khuyên dùng" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,5"/>
-                                        <TextBlock Text="Kích hoạt vĩnh viễn cho Windows 10/11 (Home/Pro/Education). Phương pháp tốt nhất, được Microsoft chấp nhận. Kích hoạt liên kết với phần cứng, không mất khi cài lại Windows." 
-                                                   TextWrapping="Wrap" 
-                                                   Opacity="0.7" 
-                                                   FontSize="13" 
-                                                   LineHeight="20"/>
-                                    </StackPanel>
-                                </Grid>
-                                
-                                <Grid Margin="0,0,0,15">
-                                    <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
+
                                     <Border Width="40" Height="40" Background="#10FFFFFF" CornerRadius="8" Margin="0,0,15,0">
-                                        <TextBlock Text="2" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <TextBlock Text="1" 
+                               FontSize="20" 
+                               FontWeight="Bold" 
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"/>
                                     </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="KMS38 (Until 2038)" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,5"/>
-                                        <TextBlock Text="Kích hoạt đến năm 2038 cho Windows Server, LTSC và Enterprise editions. Không hoạt động với Home/Pro. Sau khi kích hoạt không cần kết nối internet nữa." 
-                                                   TextWrapping="Wrap" 
-                                                   Opacity="0.7" 
-                                                   FontSize="13" 
-                                                   LineHeight="20"/>
-                                    </StackPanel>
                                 </Grid>
-                                
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Border Width="40" Height="40" Background="#10FFFFFF" CornerRadius="8" Margin="0,0,15,0">
-                                        <TextBlock Text="3" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Online KMS (180 days)" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,5"/>
-                                        <TextBlock Text="Kích hoạt 180 ngày, tự động gia hạn nếu kết nối internet. Dùng khi HWID không khả dụng. Yêu cầu kết nối internet để gia hạn." 
-                                                   TextWrapping="Wrap" 
-                                                   Opacity="0.7" 
-                                                   FontSize="13" 
-                                                   LineHeight="20"/>
-                                    </StackPanel>
-                                </Grid>
+
+                                <TextBlock Text="Lưu ý: Cần kết nối Internet để xác thực key với máy chủ Microsoft" 
+                       FontSize="12" 
+                       Opacity="0.7"
+                       TextWrapping="Wrap"
+                       Margin="0,10,0,0"/>
                             </StackPanel>
                         </ui:Card>
 
+                        <!-- Kích hoạt Office bằng Key -->
                         <ui:Card Padding="25" Margin="0,0,0,15">
                             <StackPanel>
-                                <TextBlock Text="Kích hoạt Office" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,15"/>
-                                
+                                <TextBlock Text="Kích hoạt Office bằng Key" 
+                       FontSize="20" 
+                       FontWeight="SemiBold" 
+                       Margin="0,0,0,15"/>
+
                                 <Grid Margin="0,0,0,15">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Border Width="40" Height="40" Background="#10FFFFFF" CornerRadius="8" Margin="0,0,15,0">
-                                        <TextBlock Text="1" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Ohook (Permanent) - Khuyên dùng" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,5"/>
-                                        <TextBlock Text="Kích hoạt vĩnh viễn cho Office 2016/2019/2021/365. Phương pháp tốt nhất, không cần kết nối internet sau khi kích hoạt. Hỗ trợ tất cả tính năng Office 365." 
-                                                   TextWrapping="Wrap" 
-                                                   Opacity="0.7" 
-                                                   FontSize="13" 
-                                                   LineHeight="20"/>
-                                    </StackPanel>
-                                </Grid>
-                                
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
+
                                     <Border Width="40" Height="40" Background="#10FFFFFF" CornerRadius="8" Margin="0,0,15,0">
-                                        <TextBlock Text="2" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <TextBlock Text="2" 
+                               FontSize="20" 
+                               FontWeight="Bold" 
+                               HorizontalAlignment="Center" 
+                               VerticalAlignment="Center"/>
                                     </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="Online KMS (180 days)" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,5"/>
-                                        <TextBlock Text="Kích hoạt 180 ngày, tự động gia hạn nếu kết nối internet. Dùng khi Ohook không khả dụng hoặc gặp vấn đề với antivirus." 
-                                                   TextWrapping="Wrap" 
-                                                   Opacity="0.7" 
-                                                   FontSize="13" 
-                                                   LineHeight="20"/>
-                                    </StackPanel>
                                 </Grid>
+
+                                <TextBlock Text="Key Office áp dụng cho 2016, 2019, 2021, 365. Kiểm tra phiên bản Office trước khi nhập key" 
+                       FontSize="12" 
+                       Opacity="0.7"
+                       TextWrapping="Wrap"
+                       Margin="0,10,0,0"/>
                             </StackPanel>
                         </ui:Card>
 
+                        <!-- Trạng thái kích hoạt -->
+                        <ui:Card Padding="25" Margin="0,0,0,15">
+                            <StackPanel>
+                                <TextBlock Text="Trạng thái kích hoạt" 
+                       FontSize="20" 
+                       FontWeight="SemiBold" 
+                       Margin="0,0,0,15"/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                    <ui:SymbolIcon x:Name="WindowsStatusIcon" 
+                               Symbol="Checkmark24" 
+                               FontSize="20" 
+                               Foreground="#10B981" 
+                               Margin="0,0,10,0"
+                               Visibility="Collapsed"/>
+                                    <TextBlock x:Name="WindowsStatusText" 
+                           Text="Windows: Chưa kích hoạt" 
+                           VerticalAlignment="Center"
+                           FontSize="14"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon x:Name="OfficeStatusIcon" 
+                               Symbol="Checkmark24" 
+                               FontSize="20" 
+                               Foreground="#10B981" 
+                               Margin="0,0,10,0"
+                               Visibility="Collapsed"/>
+                                    <TextBlock x:Name="OfficeStatusText" 
+                           Text="Office: Chưa kích hoạt" 
+                           VerticalAlignment="Center"
+                           FontSize="14"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </ui:Card>
+
+                        <!-- Lưu ý quan trọng -->
                         <ui:Card Padding="25">
                             <StackPanel>
-                                <TextBlock Text="Lưu ý quan trọng" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,15"/>
-                                
+                                <TextBlock Text="Lưu ý quan trọng" 
+                       FontSize="20" 
+                       FontWeight="SemiBold" 
+                       Margin="0,0,0,15"/>
+
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                    <ui:SymbolIcon Symbol="Warning24" FontSize="20" Foreground="#F59E0B" Margin="0,0,10,0"/>
-                                    <TextBlock Text="Tạm tắt Windows Defender/Antivirus trước khi kích hoạt để tránh bị chặn" 
-                                               TextWrapping="Wrap" 
-                                               VerticalAlignment="Center"
-                                               FontSize="13"/>
-                                </StackPanel>
-                                
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                    <ui:SymbolIcon Symbol="Shield24" FontSize="20" Foreground="#3B82F6" Margin="0,0,10,0"/>
-                                    <TextBlock Text="Chạy ứng dụng với quyền Administrator để đảm bảo hoạt động tốt" 
-                                               TextWrapping="Wrap" 
-                                               VerticalAlignment="Center"
-                                               FontSize="13"/>
+                                    <ui:SymbolIcon Symbol="Warning24" 
+                               FontSize="20" 
+                               Foreground="#F59E0B" 
+                               Margin="0,0,10,0"/>
+                                    <TextBlock Text="Chỉ sử dụng Product Key hợp lệ, đúng phiên bản Windows/Office" 
+                           TextWrapping="Wrap" 
+                           VerticalAlignment="Center"
+                           FontSize="13"/>
                                 </StackPanel>
 
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                    <ui:SymbolIcon Symbol="SaveCopy24" FontSize="20" Foreground="#10B981" Margin="0,0,10,0"/>
-                                    <TextBlock Text="Sao lưu dữ liệu quan trọng trước khi thực hiện bất kỳ thay đổi nào" 
-                                               TextWrapping="Wrap" 
-                                               VerticalAlignment="Center"
-                                               FontSize="13"/>
+                                    <ui:SymbolIcon Symbol="Info24" 
+                               FontSize="20" 
+                               Foreground="#3B82F6" 
+                               Margin="0,0,10,0"/>
+                                    <TextBlock Text="Key có 25 ký tự, định dạng: XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" 
+                           TextWrapping="Wrap" 
+                           VerticalAlignment="Center"
+                           FontSize="13"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:SymbolIcon Symbol="Shield24" 
+                               FontSize="20" 
+                               Foreground="#10B981" 
+                               Margin="0,0,10,0"/>
+                                    <TextBlock Text="Đảm bảo kết nối Internet ổn định trong quá trình kích hoạt" 
+                           TextWrapping="Wrap" 
+                           VerticalAlignment="Center"
+                           FontSize="13"/>
                                 </StackPanel>
                             </StackPanel>
                         </ui:Card>
                     </StackPanel>
 
-                    </Grid>
+                </Grid>
                 </ScrollViewer>
             
             <!-- Global Busy Overlay (blocks input while processing) -->
@@ -2746,7 +2757,6 @@
             </Grid>
         </Grid>
         
-        <!-- SnackbarPresenter thay thế Snackbar trực tiếp -->
         <ui:SnackbarPresenter x:Name="SnackbarPresenter" Grid.Row="1" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="20"/>
         </Grid>
 

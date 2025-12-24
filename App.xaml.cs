@@ -63,13 +63,13 @@ namespace ZibllWindows
         {
             try
             {
-                var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ActivationTool");
+                var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ZibllWindows");
                 Directory.CreateDirectory(logDir);
-                var logPath = Path.Combine(logDir, "activationtool_error.log");
+                var logPath = Path.Combine(logDir, "alexherry_error.log");
                 File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {title}: {ex}\n\n");
 
                 // Use a simple MessageBox here to ensure no dependency on UI libraries
-                System.Windows.MessageBox.Show($"{title}: {ex.Message}\n\nLog: {logPath}", "ActivationTool - Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                System.Windows.MessageBox.Show($"{title}: {ex.Message}\n\nLog: {logPath}", "ZibllWindows - Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             catch
             {
@@ -95,9 +95,9 @@ namespace ZibllWindows
             {
                 try
                 {
-                    var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ActivationTool");
+                    var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ZibllWindows");
                     Directory.CreateDirectory(logDir);
-                    var logPath = Path.Combine(logDir, "activationtool_error.log");
+                    var logPath = Path.Combine(logDir, "alexherry_error.log");
                     File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Unhandled (AppDomain): {e.ExceptionObject}\n\n");
                 }
                 catch { }

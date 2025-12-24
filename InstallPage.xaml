@@ -2,99 +2,67 @@
                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-                 Title="Cài đặt ZibllWindows"
-                 Width="600"
-                 Height="500"
+                 Title="ZibllWindows Setup"
+                 Width="650" Height="480"
                  WindowStartupLocation="CenterScreen"
+                 WindowCornerPreference="Round"
                  ResizeMode="NoResize">
-    <Grid Margin="30">
+
+    <Grid Background="{ui:ThemeResource ApplicationBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,30">
-            <ui:SymbolIcon Symbol="Download24" FontSize="48" Foreground="#0078D4" Margin="0,0,0,15" HorizontalAlignment="Center"/>
-            <TextBlock Text="Cài đặt ZibllWindows" 
-                       FontSize="24" 
-                       FontWeight="Bold"
-                       HorizontalAlignment="Center"
-                       Margin="0,0,0,10"/>
-            <TextBlock x:Name="StatusText"
-                       Text="Đang kiểm tra cập nhật..."
-                       FontSize="14"
-                       Foreground="Gray"
-                       HorizontalAlignment="Center"
-                       TextWrapping="Wrap"
-                       TextAlignment="Center"/>
-        </StackPanel>
-        
-        <!-- Progress and Info -->
-        <StackPanel Grid.Row="1" VerticalAlignment="Center">
-            <ui:ProgressRing x:Name="ProgressRing"
-                             IsIndeterminate="True"
-                             Width="60"
-                             Height="60"
-                             HorizontalAlignment="Center"
-                             Margin="0,0,0,20"
-                             Visibility="Visible"/>
-            
-            <ProgressBar x:Name="ProgressBar"
-                         Value="0"
-                         Maximum="100"
-                         Height="8"
-                         Margin="0,0,0,20"
-                         Visibility="Collapsed"/>
-            
-            <TextBlock x:Name="ProgressText"
-                       Text=""
-                       FontSize="12"
-                       Foreground="Gray"
-                       HorizontalAlignment="Center"
-                       TextWrapping="Wrap"
-                       TextAlignment="Center"
-                       Margin="0,0,0,20"/>
-            
-            <Border x:Name="InfoBorder"
-                    Background="#F0F0F0"
-                    CornerRadius="8"
-                    Padding="15"
-                    Visibility="Collapsed">
-                <StackPanel>
-                    <TextBlock Text="Thông tin cài đặt:" 
-                               FontWeight="SemiBold" 
-                               Margin="0,0,0,10"/>
-                    <TextBlock x:Name="InstallInfoText"
-                               TextWrapping="Wrap"
-                               FontSize="12"/>
+
+        <ui:TitleBar Title="ZibllWindows Installer" Grid.Row="0" Icon="Apps24"/>
+
+        <StackPanel Grid.Row="1" Margin="40,0" VerticalAlignment="Center">
+            <ui:SymbolIcon x:Name="StateIcon" Symbol="CheckmarkCircle24" FontSize="72" Filled="True" 
+                           Foreground="{ui:ThemeResource SystemAccentColorLight3Brush}" 
+                           Margin="0,0,0,24" HorizontalAlignment="Center"/>
+
+            <TextBlock x:Name="StatusTitle" Text="Đang khởi tạo..." 
+                       FontSize="28" FontWeight="Bold" HorizontalAlignment="Center"/>
+
+            <TextBlock x:Name="StatusText" Text="Vui lòng chờ giây lát" 
+                       FontSize="14" Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}" 
+                       HorizontalAlignment="Center" Margin="0,12,0,32" TextAlignment="Center"/>
+
+            <Grid Margin="40,0">
+                <ui:ProgressRing x:Name="MainProgressRing" IsIndeterminate="True" 
+                                 Width="40" Height="40" Visibility="Visible"/>
+
+                <StackPanel x:Name="InstallProgressStack" Visibility="Collapsed">
+                    <ProgressBar x:Name="MainProgressBar" Height="6" Value="0" Maximum="100"/>
+                    <TextBlock x:Name="ProgressDetailText" Text="Đang chuẩn bị..." 
+                               FontSize="12" Margin="0,8,0,0" HorizontalAlignment="Center" 
+                               Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"/>
                 </StackPanel>
-            </Border>
+            </Grid>
+
+            <ui:CardControl x:Name="StatusCard" Margin="0,24,0,0" Visibility="Collapsed" 
+                            Icon="Info24" Header="Thông báo">
+                <TextBlock x:Name="InstallInfoText" FontSize="12" TextWrapping="Wrap"/>
+            </ui:CardControl>
         </StackPanel>
-        
-        <!-- Buttons -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
-            <ui:Button x:Name="InstallButton"
-                       Content="Cài đặt"
-                       Appearance="Primary"
-                       Click="InstallButton_Click"
-                       IsEnabled="False"
-                       Margin="0,0,10,0"
-                       Visibility="Collapsed"/>
-            <ui:Button x:Name="SkipButton"
-                       Content="Bỏ qua"
-                       Click="SkipButton_Click"
-                       Visibility="Collapsed"/>
-            <ui:Button x:Name="UninstallButton"
-                       Content="Gỡ cài đặt"
-                       Appearance="Danger"
-                       Click="UninstallButton_Click"
-                       Visibility="Collapsed"/>
-            <ui:Button x:Name="CloseButton"
-                       Content="Đóng"
-                       Click="CloseButton_Click"
-                       Visibility="Collapsed"/>
-        </StackPanel>
+
+        <Border Grid.Row="2" Background="{ui:ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                Padding="24" BorderBrush="{ui:ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+            <Grid>
+                <ui:Button x:Name="UninstallButton" Content="Gỡ cài đặt" Icon="Delete24" 
+                           Appearance="Secondary" Click="UninstallButton_Click" 
+                           HorizontalAlignment="Left" Visibility="Collapsed"/>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <ui:Button x:Name="SkipButton" Content="Để sau" Width="100" Margin="0,0,12,0"
+                               Appearance="Secondary" Click="SkipButton_Click" Visibility="Collapsed"/>
+                    <ui:Button x:Name="InstallButton" Content="Cài đặt ngay" Width="140"
+                               Appearance="Primary" Click="InstallButton_Click" Visibility="Collapsed"/>
+                    <ui:Button x:Name="CloseButton" Content="Đóng" Width="100"
+                               Appearance="Secondary" Click="CloseButton_Click" Visibility="Collapsed"/>
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </ui:FluentWindow>
